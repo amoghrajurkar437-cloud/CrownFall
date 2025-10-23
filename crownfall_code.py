@@ -1,5 +1,6 @@
-import pygame
+import pygame, os
 pygame.init()
+os.chdir(os.path.dirname(__file__))  # make working dir = script folder
 
 # Constants
 ROOM_WIDTH = 800
