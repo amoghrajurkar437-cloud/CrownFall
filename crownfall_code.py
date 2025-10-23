@@ -20,6 +20,7 @@ speed = 7
 # Store collidable objects for each room
 room_colliders = {}
 
+# Functions to draw objects
 def draw_objects(x, y, width, height, surface, colliders):
     """Draws an object (tree, rock, wall, house, etc) onto a given surface at position (x, y) with the specified dimensions (weight, height)
     Certain object types (tree, rock, wall, house) are added to the colliders list to create collision boundaries.
@@ -30,23 +31,33 @@ def draw_objects(x, y, width, height, surface, colliders):
 
     # Tree
     if width == 180 and height == 240:
-        pygame.draw.rect(surface, (0, 255, 0), obj_rect)
+        image = pygame.image.load("crownfall_images/Tree_1.png")
+        image = pygame.transform.scale(image, (width + 50, height + 50))
+        surface.blit(image, (x - 25, y - 25))
         colliders.append(obj_rect)
     # Rock
     elif width == 100 and height == 100:
-        pygame.draw.rect(surface, (128, 128, 128), obj_rect)
+        image = pygame.image.load("crownfall_images/Rock_1.png")
+        image = pygame.transform.scale(image, (width + 100, height + 100))
+        surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
     # Wall
     elif width == 150 and height == 200:
-        pygame.draw.rect(surface, (255, 0, 0), obj_rect)
+        image = pygame.image.load("crownfall_images/Wall_1.png")
+        image = pygame.transform.scale(image, (width + 100, height + 100))
+        surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
     # House
     elif width == 300 and height == 300:
-        pygame.draw.rect(surface, (139, 69, 19), obj_rect)
+        image = pygame.image.load("crownfall_images/House_1.png")
+        image = pygame.transform.scale(image, (width + 100, height + 100))
+        surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
     # Artifact (walkable)
     elif width == 25 and height == 25:
-        pygame.draw.rect(surface, (0, 0, 0), obj_rect)
+        image = pygame.image.load("crownfall_images/Artifact.png")
+        image = pygame.transform.scale(image, (width + 40, height + 40))
+        surface.blit(image, (x - 20, y - 20))
         # artifact -> no collider
 
 def draw_current_room(surface, level, row, col):
@@ -55,7 +66,9 @@ def draw_current_room(surface, level, row, col):
     Takes in: surface to draw on, level index, row index, column index
     Does: Draw the room and update colliders"""
     # Clear previous drawings
-    surface.fill((255, 255, 255))
+    image = pygame.image.load("crownfall_images/Level_bg_1.jpg")
+    image = pygame.transform.scale(image, (ROOM_WIDTH, ROOM_HEIGHT))
+    surface.blit(image, (0, 0))
     colliders = []
     
     # Helper: center stone placed when room uses placeholder visuals
@@ -63,7 +76,12 @@ def draw_current_room(surface, level, row, col):
         cx = ROOM_WIDTH // 2 - 50
         cy = ROOM_HEIGHT // 2 - 50
         draw_objects(cx, cy, 100, 100, surface, colliders)
-
+    
+    #Tree: 180x240
+    #Rock: 100x100
+    #Wall: 150x200
+    #House: 300x300
+    #Artifact: 25x25
     # ──────────────── LEVEL 1 ────────────────
     if level == 0 and row == 0 and col == 0:
         # Level 1 - Bottom-left room
@@ -209,6 +227,7 @@ def draw_current_room(surface, level, row, col):
     # Save room-specific colliders
     room_colliders[(level, row, col)] = colliders
 
+# Movement and collision functions
 def move_player_with_collision(dx, dy, colliders):
     """Moves the player rectangle based on input deltas (dx, dy) while preventing overlap with solid objects (colliders).
     Takes in: change in x (dx), change in y (dy), list of colliders
@@ -294,6 +313,7 @@ def handle_room_transition(colliders):
              player.left = 50
              player.top = ROOM_HEIGHT - 100
 
+#Mini map area name function
 def get_area_name(row, col):
    """Generates a readable name for the area based on its row and column indices.
    Takes in: row index, column index
@@ -306,30 +326,34 @@ def get_area_name(row, col):
 # Game loop
 running = True
 while running:
-   for event in pygame.event.get():
+    for event in pygame.event.get():
       if event.type == pygame.QUIT:
          running = False
 
+    keys = pygame.key.get_pressed()
+    move_left  = keys[pygame.K_a] or keys[pygame.K_LEFT]
+    move_right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
+    move_up    = keys[pygame.K_w] or keys[pygame.K_UP]
+    move_down  = keys[pygame.K_s] or keys[pygame.K_DOWN]
+    dx = (move_right - move_left) * speed
+    dy = (move_down - move_up) * speed
 
-   keys = pygame.key.get_pressed()
-   dx = (keys[pygame.K_d] - keys[pygame.K_a]) * speed
-   dy = (keys[pygame.K_s] - keys[pygame.K_w]) * speed
 
-   level, row, col = current_room
-   draw_current_room(screen, level, row, col)
-   colliders = room_colliders.get((level, row, col), [])
+    level, row, col = current_room
+    draw_current_room(screen, level, row, col)
+    colliders = room_colliders.get((level, row, col), [])
 
-   move_player_with_collision(dx, dy, colliders)
-   handle_room_transition(colliders)
+    move_player_with_collision(dx, dy, colliders)
+    handle_room_transition(colliders)
 
-   pygame.draw.rect(screen, (0, 0, 0), player)
+    pygame.draw.rect(screen, (0, 0, 0), player)
 
-   area_text = f"Level {level + 1} - {get_area_name(row, col)}"
-   text_surface = font.render(area_text, True, (0, 0, 0))
-   text_rect = text_surface.get_rect(topright=(ROOM_WIDTH - 10, 10))
-   screen.blit(text_surface, text_rect)
+    area_text = f"Level {level + 1} - {get_area_name(row, col)}"
+    text_surface = font.render(area_text, True, (255, 255, 255))
+    text_rect = text_surface.get_rect(topright=(ROOM_WIDTH - 10, 10))
+    screen.blit(text_surface, text_rect)
 
-   pygame.display.flip()
-   clock.tick(60)
+    pygame.display.flip()
+    clock.tick(60)
 
 pygame.quit()
