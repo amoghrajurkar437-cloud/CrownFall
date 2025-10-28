@@ -1,4 +1,7 @@
-import pygame, os
+import pygame
+import os
+
+from pygame import draw
 pygame.init()
 os.chdir(os.path.dirname(__file__))  # make working dir = script folder
 
@@ -16,7 +19,7 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 30)
 current_room = [0, 0, 0]
 player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
-speed = 7
+speed = 10
 
 # Store collidable objects for each room
 room_colliders = {}
@@ -36,15 +39,27 @@ def draw_objects(x, y, width, height, surface, colliders):
         image = pygame.transform.scale(image, (width + 50, height + 50))
         surface.blit(image, (x - 25, y - 25))
         colliders.append(obj_rect)
+    # Tree 2
+    elif width == 150 and height == 200:
+        image = pygame.image.load("crownfall_images/Tree_2.png")
+        image = pygame.transform.scale(image, (width + 50, height + 50))
+        surface.blit(image, (x - 25, y - 25))
+        colliders.append(obj_rect)
     # Rock
     elif width == 100 and height == 100:
         image = pygame.image.load("crownfall_images/Rock_1.png")
         image = pygame.transform.scale(image, (width + 100, height + 100))
         surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
+    # Rock 2
+    elif width == 50 and height == 75:
+        image = pygame.image.load("crownfall_images/Rock_2.png")
+        image = pygame.transform.scale(image, (width + 100, height + 100))
+        surface.blit(image, (x - 50, y - 50))
+        colliders.append(obj_rect)
     # Wall
     elif width == 150 and height == 200:
-        image = pygame.image.load("crownfall_images/Wall_1.png")
+        image = pygame.image.load("crownfall_images/Wall.png")
         image = pygame.transform.scale(image, (width + 100, height + 100))
         surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
@@ -54,12 +69,28 @@ def draw_objects(x, y, width, height, surface, colliders):
         image = pygame.transform.scale(image, (width + 100, height + 100))
         surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
-    # Artifact (walkable)
+    # House 2
+    elif width == 300 and height == 400:
+        image = pygame.image.load("crownfall_images/House_2.png")
+        image = pygame.transform.scale(image, (width + 100, height + 100))
+        surface.blit(image, (x - 50, y - 50))
+        colliders.append(obj_rect)
+    # Villager
+    elif width == 100 and height == 200:
+        image = pygame.image.load("crownfall_images/Villager_1.png")
+        image = pygame.transform.scale(image, (width + 20, height + 20))
+        surface.blit(image, (x - 10, y - 10))
+        colliders.append(obj_rect)
+    # Gold -> (walkable)
+    elif width == 50 and height == 50:
+        image = pygame.image.load("crownfall_images/Gold.png")
+        image = pygame.transform.scale(image, (width + 30, height + 30))
+        surface.blit(image, (x - 15, y - 15))    
+    # Artifact -> (walkable)
     elif width == 25 and height == 25:
         image = pygame.image.load("crownfall_images/Artifact.png")
         image = pygame.transform.scale(image, (width + 40, height + 40))
         surface.blit(image, (x - 20, y - 20))
-        # artifact -> no collider
 
 def draw_current_room(surface, level, row, col):
     """Renders all visual elements (placeholders or objects) for the specified room in the grid.
@@ -72,158 +103,134 @@ def draw_current_room(surface, level, row, col):
     surface.blit(image, (0, 0))
     colliders = []
     
-    # Helper: center stone placed when room uses placeholder visuals
-    def place_center_stone():
-        cx = ROOM_WIDTH // 2 - 50
-        cy = ROOM_HEIGHT // 2 - 50
-        draw_objects(cx, cy, 100, 100, surface, colliders)
-    
     #Tree: 180x240
+    #Tree 2: 150x200
     #Rock: 100x100
+    #Rock 2: 50x75
     #Wall: 150x200
     #House: 300x300
+    #House 2: 300x400
+    #Villager: 100x200
+    #Gold: 50x50
     #Artifact: 25x25
+    
+    #draw_objects(x, y, width, height, surface, colliders)
     # ──────────────── LEVEL 1 ────────────────
     if level == 0 and row == 0 and col == 0:
         # Level 1 - Bottom-left room
-        draw_objects(450, 250, 300, 300, surface, colliders)
-        draw_objects(225, 300, 180, 240, surface, colliders)
-        draw_objects(25, 50, 100, 100, surface, colliders) 
-        draw_objects(175, 25, 100, 100, surface, colliders)
-        draw_objects(600, 150, 25, 25, surface, colliders)
-
+        draw_objects(400, 250, 300, 300, surface, colliders) # House
+        draw_objects(225, 300, 180, 240, surface, colliders) # Tree
+        draw_objects(25, 50, 100, 100, surface, colliders)  # Rock
+        draw_objects(175, 25, 50, 75, surface, colliders)  # Rock 2
+        draw_objects(600, 150, 25, 25, surface, colliders)  # Artifact
     elif level == 0 and row == 0 and col == 1:
         # Level 1 - Bottom-middle room
-        draw_objects(350, 250, 100, 100, surface, colliders)
+        draw_objects(100, 100, 150, 200, surface, colliders)  # Tree 2
+        draw_objects(350, 250, 50, 75, surface, colliders)  # Rock 2
+        draw_objects(450, 100, 100, 200, surface, colliders)  # Villager
+        draw_objects(600, 400, 50, 50, surface, colliders)  # Gold
 
     elif level == 0 and row == 0 and col == 2:
         # Level 1 - Bottom-right room (placeholder line)
         pygame.draw.line(surface, (0, 0, 255), (0, 0), (800, 600), 5)
-        place_center_stone()
 
     elif level == 0 and row == 1 and col == 0:
         # Level 1 - Middle-left room (ellipse placeholder)
         pygame.draw.ellipse(surface, (255, 255, 0), (300, 200, 200, 100))
-        place_center_stone()
 
     elif level == 0 and row == 1 and col == 1:
         # Level 1 - Center room (polygon placeholder)
         pygame.draw.polygon(surface, (255, 0, 255), [(400, 200), (500, 400), (300, 400)])
-        place_center_stone()
 
     elif level == 0 and row == 1 and col == 2:
         # Level 1 - Middle-right room (outlined rect placeholder)
         pygame.draw.rect(surface, (0, 255, 255), (100, 100, 600, 400), 10)
-        place_center_stone()
 
     elif level == 0 and row == 2 and col == 0:
         # Level 1 - Top-left room (line placeholder)
         pygame.draw.line(surface, (255, 255, 255), (0, 300), (800, 300), 3)
-        place_center_stone()
 
     elif level == 0 and row == 2 and col == 1:
         # Level 1 - Top-middle room (circle placeholder)
         pygame.draw.circle(surface, (128, 0, 128), (400, 300), 75, 5)
-        place_center_stone()
 
     elif level == 0 and row == 2 and col == 2:
         # Level 1 - Top-right room
         pygame.draw.rect(surface, (128, 128, 0), (200, 150, 400, 300))
-        # Add a stone to act as collider too
-        draw_objects(350, 250, 100, 100, surface, colliders)
 
     # ──────────────── LEVEL 2 ────────────────
     elif level == 1 and row == 0 and col == 0:
         # Level 2 - Bottom-left room
         pygame.draw.rect(surface, (100, 100, 255), (350, 250, 100, 100))
-        # Also add center stone
-        draw_objects(350, 150, 100, 100, surface, colliders)
 
     elif level == 1 and row == 0 and col == 1:
         # Level 2 - Bottom-middle room
         pygame.draw.rect(surface, (255, 100, 100), (300, 200, 200, 200))
-        draw_objects(350, 300, 100, 100, surface, colliders)
 
     elif level == 1 and row == 0 and col == 2:
         # Level 2 - Bottom-right room (diagonal line placeholder)
         pygame.draw.line(surface, (0, 255, 100), (0, 600), (800, 0), 5)
-        place_center_stone()
 
     elif level == 1 and row == 1 and col == 0:
         # Level 2 - Middle-left room (ellipse)
         pygame.draw.ellipse(surface, (100, 255, 255), (250, 250, 300, 150))
-        place_center_stone()
 
     elif level == 1 and row == 1 and col == 1:
         # Level 2 - Center room (polygon)
         pygame.draw.polygon(surface, (200, 200, 0), [(400, 100), (600, 500), (200, 500)])
-        place_center_stone()
 
     elif level == 1 and row == 1 and col == 2:
         # Level 2 - Middle-right room (outlined big rect)
         pygame.draw.rect(surface, (0, 100, 200), (150, 150, 500, 300), 8)
-        place_center_stone()
 
     elif level == 1 and row == 2 and col == 0:
         # Level 2 - Top-left room (small diagonal line)
         pygame.draw.line(surface, (255, 0, 0), (0, 0), (800, 600), 2)
-        place_center_stone()
 
     elif level == 1 and row == 2 and col == 1:
         # Level 2 - Top-middle room (circle)
         pygame.draw.circle(surface, (0, 255, 0), (400, 300), 60)
-        draw_objects(370, 270, 100, 100, surface, colliders)
 
     elif level == 1 and row == 2 and col == 2:
         # Level 2 - Top-right room
         pygame.draw.rect(surface, (0, 0, 255), (250, 200, 300, 200))
-        draw_objects(350, 250, 100, 100, surface, colliders)
 
     # ──────────────── LEVEL 3 ────────────────
     elif level == 2 and row == 0 and col == 0:
         # Level 3 - Bottom-left room (small circle placeholder)
         pygame.draw.circle(surface, (255, 255, 255), (400, 300), 30)
-        place_center_stone()
 
     elif level == 2 and row == 0 and col == 1:
         # Level 3 - Bottom-middle room
         pygame.draw.rect(surface, (200, 100, 50), (300, 250, 200, 100))
-        draw_objects(350, 300, 100, 100, surface, colliders)
 
     elif level == 2 and row == 0 and col == 2:
         # Level 3 - Bottom-right room (line)
         pygame.draw.line(surface, (50, 200, 100), (0, 0), (800, 600), 4)
-        place_center_stone()
 
     elif level == 2 and row == 1 and col == 0:
         # Level 3 - Middle-left room (ellipse)
         pygame.draw.ellipse(surface, (100, 0, 200), (200, 200, 400, 150))
-        place_center_stone()
 
     elif level == 2 and row == 1 and col == 1:
         # Level 3 - Center room (polygon)
         pygame.draw.polygon(surface, (0, 200, 200), [(400, 150), (550, 450), (250, 450)])
-        place_center_stone()
 
     elif level == 2 and row == 1 and col == 2:
         # Level 3 - Middle-right room (big rect)
         pygame.draw.rect(surface, (255, 128, 0), (100, 100, 600, 400), 6)
-        draw_objects(350, 250, 100, 100, surface, colliders)
 
     elif level == 2 and row == 2 and col == 0:
         # Level 3 - Top-left room (horizontal line)
         pygame.draw.line(surface, (128, 128, 128), (0, 300), (800, 300), 3)
-        place_center_stone()
 
     elif level == 2 and row == 2 and col == 1:
         # Level 3 - Top-middle room (large circle)
         pygame.draw.circle(surface, (0, 128, 128), (400, 300), 90, 3)
-        place_center_stone()
 
     elif level == 2 and row == 2 and col == 2:
         # Level 3 - Top-right room
         pygame.draw.rect(surface, (128, 0, 0), (200, 150, 400, 300))
-        draw_objects(350, 250, 100, 100, surface, colliders)
 
     # Save room-specific colliders
     room_colliders[(level, row, col)] = colliders
@@ -233,7 +240,7 @@ def move_player_with_collision(dx, dy, colliders):
     """Moves the player rectangle based on input deltas (dx, dy) while preventing overlap with solid objects (colliders).
     Takes in: change in x (dx), change in y (dy), list of colliders
     Does: Move player with collision detection"""
-    # Move horizontally
+    # Move horizontally with collision
     player.x += dx
     for collider in colliders:
         if player.colliderect(collider):
@@ -242,7 +249,7 @@ def move_player_with_collision(dx, dy, colliders):
             elif dx < 0:  # Moving left
                 player.left = collider.right
 
-    # Move vertically
+    # Move vertically with collision
     player.y += dy
     for collider in colliders:
         if player.colliderect(collider):
@@ -266,6 +273,7 @@ def handle_room_transition(colliders):
     left_edge = pygame.Rect(0, player.y, buffer, player.height)
     right_edge = pygame.Rect(ROOM_WIDTH - buffer, player.y, buffer, player.height)
 
+    # Check for blockers
     blocked_left = any(left_edge.colliderect(c) for c in colliders)
     blocked_right = any(right_edge.colliderect(c) for c in colliders)
 
@@ -356,5 +364,4 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
-
 pygame.quit()
