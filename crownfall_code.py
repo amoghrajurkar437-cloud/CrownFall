@@ -1,3 +1,5 @@
+#Make sure your folder name is 'Crownfall'
+
 import pygame
 import os
 
@@ -364,4 +366,5 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
+
 pygame.quit()
