@@ -1,5 +1,3 @@
-#Make sure your folder name is 'Crownfall'
-
 import pygame
 import os
 
@@ -21,7 +19,7 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 30)
 current_room = [0, 0, 0]
 player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
-speed = 10
+speed = 5
 
 # Store collidable objects for each room
 room_colliders = {}
@@ -71,11 +69,11 @@ def draw_objects(x, y, width, height, surface, colliders):
         image = pygame.transform.scale(image, (width + 100, height + 100))
         surface.blit(image, (x - 50, y - 50))
         colliders.append(obj_rect)
-    # House 2
-    elif width == 300 and height == 400:
+    # Big House
+    elif width == 500 and height == 250:
         image = pygame.image.load("crownfall_images/House_2.png")
-        image = pygame.transform.scale(image, (width + 100, height + 100))
-        surface.blit(image, (x - 50, y - 50))
+        image = pygame.transform.scale(image, (width + 200, height + 400))
+        surface.blit(image, (x - 100, y - 200))
         colliders.append(obj_rect)
     # Villager
     elif width == 100 and height == 200:
@@ -111,7 +109,7 @@ def draw_current_room(surface, level, row, col):
     #Rock 2: 50x75
     #Wall: 150x200
     #House: 300x300
-    #House 2: 300x400
+    #Big House: 500x250
     #Villager: 100x200
     #Gold: 50x50
     #Artifact: 25x25
@@ -127,38 +125,49 @@ def draw_current_room(surface, level, row, col):
         draw_objects(600, 150, 25, 25, surface, colliders)  # Artifact
     elif level == 0 and row == 0 and col == 1:
         # Level 1 - Bottom-middle room
-        draw_objects(100, 100, 150, 200, surface, colliders)  # Tree 2
+        draw_objects(550, 300, 180, 240, surface, colliders)  # Tree
         draw_objects(350, 250, 50, 75, surface, colliders)  # Rock 2
         draw_objects(450, 100, 100, 200, surface, colliders)  # Villager
-        draw_objects(600, 400, 50, 50, surface, colliders)  # Gold
-
+        draw_objects(400, 500, 50, 50, surface, colliders)  # Gold
     elif level == 0 and row == 0 and col == 2:
-        # Level 1 - Bottom-right room (placeholder line)
-        pygame.draw.line(surface, (0, 0, 255), (0, 0), (800, 600), 5)
-
+        # Level 1 - Bottom-right room
+        draw_objects(350, 150, 500, 250, surface, colliders)  # Big House
+        draw_objects(100, 200, 180, 240, surface, colliders)  # Tree
+        draw_objects(450, 500, 100, 100, surface, colliders)  # Rock
+        draw_objects(700, 100, 25, 25, surface, colliders)  # Artifact
+        draw_objects(600, 400, 100, 200, surface, colliders)  # Villager
     elif level == 0 and row == 1 and col == 0:
-        # Level 1 - Middle-left room (ellipse placeholder)
-        pygame.draw.ellipse(surface, (255, 255, 0), (300, 200, 200, 100))
-
+        # Level 1 - Middle-left room
+        draw_objects(225, 250, 180, 240, surface, colliders)  # Tree
+        draw_objects(700, 450, 50, 50, surface, colliders)  # Gold
+        draw_objects(600, 350, 100, 100, surface, colliders)  # Rock
+        draw_objects(25, 25, 100, 200, surface, colliders)  # Villager
     elif level == 0 and row == 1 and col == 1:
-        # Level 1 - Center room (polygon placeholder)
-        pygame.draw.polygon(surface, (255, 0, 255), [(400, 200), (500, 400), (300, 400)])
-
+        # Level 1 - Center room
+        draw_objects(400, 250, 300, 300, surface, colliders)  # House
+        draw_objects(150, 350, 180, 240, surface, colliders)  # Tree
+        draw_objects(600, 150, 50, 50, surface, colliders)  # Gold
+        draw_objects(700, 400, 25, 25, surface, colliders)  # Artifact
+        #Add Weapon and Enemy
     elif level == 0 and row == 1 and col == 2:
-        # Level 1 - Middle-right room (outlined rect placeholder)
-        pygame.draw.rect(surface, (0, 255, 255), (100, 100, 600, 400), 10)
-
+        # Level 1 - Middle-right room
+        draw_objects(100, 200, 50, 75, surface, colliders)  # Rock 2
+        #Add Enemy and Water
     elif level == 0 and row == 2 and col == 0:
-        # Level 1 - Top-left room (line placeholder)
-        pygame.draw.line(surface, (255, 255, 255), (0, 300), (800, 300), 3)
-
+        # Level 1 - Top-left room
+        draw_objects(200, 225, 180, 240, surface, colliders)  # Tree
+        draw_objects(200, 150, 50, 50, surface, colliders)  # Gold
+        draw_objects(400, 400, 100, 100, surface, colliders)  # Rock
     elif level == 0 and row == 2 and col == 1:
-        # Level 1 - Top-middle room (circle placeholder)
-        pygame.draw.circle(surface, (128, 0, 128), (400, 300), 75, 5)
-
+        # Level 1 - Top-middle room
+        draw_objects(600, 300, 180, 240, surface, colliders)  # Tree
+        draw_objects(200, 25, 300, 300, surface, colliders)  # House
+        draw_objects(50, 100, 50, 50, surface, colliders)  # Gold
+        #Add Enemy
     elif level == 0 and row == 2 and col == 2:
         # Level 1 - Top-right room
-        pygame.draw.rect(surface, (128, 128, 0), (200, 150, 400, 300))
+        draw_objects(200, 150, 50, 50, surface, colliders)  # Gold
+        #Add Final Boss
 
     # ──────────────── LEVEL 2 ────────────────
     elif level == 1 and row == 0 and col == 0:
@@ -170,27 +179,27 @@ def draw_current_room(surface, level, row, col):
         pygame.draw.rect(surface, (255, 100, 100), (300, 200, 200, 200))
 
     elif level == 1 and row == 0 and col == 2:
-        # Level 2 - Bottom-right room (diagonal line placeholder)
+        # Level 2 - Bottom-right room
         pygame.draw.line(surface, (0, 255, 100), (0, 600), (800, 0), 5)
 
     elif level == 1 and row == 1 and col == 0:
-        # Level 2 - Middle-left room (ellipse)
+        # Level 2 - Middle-left room
         pygame.draw.ellipse(surface, (100, 255, 255), (250, 250, 300, 150))
 
     elif level == 1 and row == 1 and col == 1:
-        # Level 2 - Center room (polygon)
+        # Level 2 - Center room 
         pygame.draw.polygon(surface, (200, 200, 0), [(400, 100), (600, 500), (200, 500)])
 
     elif level == 1 and row == 1 and col == 2:
-        # Level 2 - Middle-right room (outlined big rect)
+        # Level 2 - Middle-right room
         pygame.draw.rect(surface, (0, 100, 200), (150, 150, 500, 300), 8)
 
     elif level == 1 and row == 2 and col == 0:
-        # Level 2 - Top-left room (small diagonal line)
+        # Level 2 - Top-left room
         pygame.draw.line(surface, (255, 0, 0), (0, 0), (800, 600), 2)
 
     elif level == 1 and row == 2 and col == 1:
-        # Level 2 - Top-middle room (circle)
+        # Level 2 - Top-middle room
         pygame.draw.circle(surface, (0, 255, 0), (400, 300), 60)
 
     elif level == 1 and row == 2 and col == 2:
@@ -199,7 +208,7 @@ def draw_current_room(surface, level, row, col):
 
     # ──────────────── LEVEL 3 ────────────────
     elif level == 2 and row == 0 and col == 0:
-        # Level 3 - Bottom-left room (small circle placeholder)
+        # Level 3 - Bottom-left room
         pygame.draw.circle(surface, (255, 255, 255), (400, 300), 30)
 
     elif level == 2 and row == 0 and col == 1:
@@ -207,27 +216,27 @@ def draw_current_room(surface, level, row, col):
         pygame.draw.rect(surface, (200, 100, 50), (300, 250, 200, 100))
 
     elif level == 2 and row == 0 and col == 2:
-        # Level 3 - Bottom-right room (line)
+        # Level 3 - Bottom-right room
         pygame.draw.line(surface, (50, 200, 100), (0, 0), (800, 600), 4)
 
     elif level == 2 and row == 1 and col == 0:
-        # Level 3 - Middle-left room (ellipse)
+        # Level 3 - Middle-left room
         pygame.draw.ellipse(surface, (100, 0, 200), (200, 200, 400, 150))
 
     elif level == 2 and row == 1 and col == 1:
-        # Level 3 - Center room (polygon)
+        # Level 3 - Center room
         pygame.draw.polygon(surface, (0, 200, 200), [(400, 150), (550, 450), (250, 450)])
 
     elif level == 2 and row == 1 and col == 2:
-        # Level 3 - Middle-right room (big rect)
+        # Level 3 - Middle-right room
         pygame.draw.rect(surface, (255, 128, 0), (100, 100, 600, 400), 6)
 
     elif level == 2 and row == 2 and col == 0:
-        # Level 3 - Top-left room (horizontal line)
+        # Level 3 - Top-left room
         pygame.draw.line(surface, (128, 128, 128), (0, 300), (800, 300), 3)
 
     elif level == 2 and row == 2 and col == 1:
-        # Level 3 - Top-middle room (large circle)
+        # Level 3 - Top-middle room
         pygame.draw.circle(surface, (0, 128, 128), (400, 300), 90, 3)
 
     elif level == 2 and row == 2 and col == 2:
@@ -366,5 +375,4 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
-
 pygame.quit()
