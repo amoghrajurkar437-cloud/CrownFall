@@ -209,15 +209,20 @@ def draw_current_room(surface, level, row, col):
     # ──────────────── LEVEL 3 ────────────────
     elif level == 2 and row == 0 and col == 0:
         # Level 3 - Bottom-left room
-        pygame.draw.circle(surface, (255, 255, 255), (400, 300), 30)
+        #draw_objects(550, 125, , , surface, colliders) #water
+        draw_objects(400, 300, 180, 240, surface, colliders) #tree
 
     elif level == 2 and row == 0 and col == 1:
         # Level 3 - Bottom-middle room
-        pygame.draw.rect(surface, (200, 100, 50), (300, 250, 200, 100))
+        draw_objects(100, 300, 100, 200, surface, colliders) #villager
+        draw_objects(500, 300, 100, 200, surface, colliders) #villager
+        draw_objects(601, 140, 180, 240, surface, colliders) #tree
 
     elif level == 2 and row == 0 and col == 2:
         # Level 3 - Bottom-right room
-        pygame.draw.line(surface, (50, 200, 100), (0, 0), (800, 600), 4)
+        draw_objects(0, 150, 150, 200, surface, colliders) #tree
+        draw_objects(700, 25, 50, 50, surface, colliders) #okane
+        #draw_objects(500, 300, , , surface, colliders) #water
 
     elif level == 2 and row == 1 and col == 0:
         # Level 3 - Middle-left room
@@ -375,4 +380,5 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
+
 pygame.quit()
