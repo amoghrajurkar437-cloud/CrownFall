@@ -4,9 +4,7 @@ import os
 pygame.init()
 os.chdir(os.path.dirname(__file__))  # make working dir = script folder
 
-# ───────────────────────────────────────────────
 # CONSTANTS & SETUP
-# ───────────────────────────────────────────────
 ROOM_WIDTH = 800
 ROOM_HEIGHT = 600
 GRID_WIDTH = 3
@@ -38,8 +36,12 @@ collected_potions = set()
 
 # OBJECT DRAW FUNCTION
 def draw_objects(x, y, obj_type, surface, colliders, artifacts, gold, potions):
-    """Draws environment and collectible objects, adds colliders/pickups as needed."""
+    """Draws an object on the game surface and adds its collider or collectible
+    reference to the appropriate list based on object type."""
+
     def load_img(name, w, h, offset=(0, 0)):
+        """Loads, scales, and draws an image, returning its rectangle."""
+        # Load and scale image
         img = pygame.image.load(f"crownfall_images/{name}.png")
         img = pygame.transform.scale(img, (w, h))
         surface.blit(img, (x - offset[0], y - offset[1]))
@@ -81,8 +83,10 @@ def draw_objects(x, y, obj_type, surface, colliders, artifacts, gold, potions):
 
 # ROOM DRAW FUNCTION
 def draw_current_room(surface, level, row, col, collected_artifacts, collected_gold, collected_potions):
-    """Draws current room visuals and sets up colliders, artifacts, gold, and potions."""
+    """Draws the current room based on the level, row, and column.
+    Adds interactive and environmental objects to their respective lists."""
 
+    # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg")
     bg = pygame.transform.scale(bg, (ROOM_WIDTH, ROOM_HEIGHT))
     surface.blit(bg, (0, 0))
@@ -135,12 +139,12 @@ def draw_current_room(surface, level, row, col, collected_artifacts, collected_g
             draw_objects(600, 150, "gold", surface, colliders, artifacts, gold, potions)  # Gold
         if can_draw(700, 400, collected_artifacts):
             draw_objects(700, 400, "artifact", surface, colliders, artifacts, gold, potions)  # Artifact
-        #Add Weapon and Enemy
+        #weapon and enemy
 
     elif level == 0 and row == 1 and col == 2:
         # Level 1 - Middle-right room
         draw_objects(100, 200, "rock2", surface, colliders, artifacts, gold, potions)  # Rock 2
-        #Add Enemy and Water
+        #enemy and water
 
     elif level == 0 and row == 2 and col == 0:
         # Level 1 - Top-left room
@@ -155,13 +159,13 @@ def draw_current_room(surface, level, row, col, collected_artifacts, collected_g
         draw_objects(200, 25, "house1", surface, colliders, artifacts, gold, potions)  # House
         if can_draw(50, 100, collected_gold):
             draw_objects(50, 100, "gold", surface, colliders, artifacts, gold, potions)  # Gold
-        #Add Enemy
+        #enemy
 
     elif level == 0 and row == 2 and col == 2:
         # Level 1 - Top-right room
         if can_draw(200, 150, collected_gold):
             draw_objects(200, 150, "gold", surface, colliders, artifacts, gold, potions)  # Gold
-        #Add Final Boss
+        #final boss
 
     # ──────────────── LEVEL 2 ────────────────
     elif level == 1 and row == 0 and col == 0:
@@ -203,14 +207,14 @@ def draw_current_room(surface, level, row, col, collected_artifacts, collected_g
     # ──────────────── LEVEL 3 ────────────────
     elif level == 2 and row == 0 and col == 0:
         # Level 3 - Bottom-left room
-        #draw_objects(550, 125, , , surface, colliders) #water
         draw_objects(400, 300, "tree1", surface, colliders, artifacts, gold, potions)
+        #water
 
     elif level == 2 and row == 0 and col == 1:
         # Level 3 - Bottom-middle room
         draw_objects(100, 300, "villager", surface, colliders, artifacts, gold, potions)
         draw_objects(500, 300, "villager", surface, colliders, artifacts, gold, potions)
-        draw_objects(601, 140, "tree1", surface, colliders, artifacts, gold, potions)
+        draw_objects(600, 140, "tree1", surface, colliders, artifacts, gold, potions)
 
     elif level == 2 and row == 0 and col == 2:
         # Level 3 - Bottom-right room
@@ -249,6 +253,7 @@ def draw_current_room(surface, level, row, col, collected_artifacts, collected_g
 
 # HUD DRAW
 def draw_hud(surface, level, row, col):
+    """Draws the player HUD, including the health bar, room info, and inventory display."""
     # Health bar box (top-left)
     box_x, box_y = 15, 10  # overall position
     box_width, box_height = 220, 70
@@ -259,7 +264,7 @@ def draw_hud(surface, level, row, col):
     label = font.render("Health", True, (255, 255, 255))
     surface.blit(label, (box_x + 70, box_y + 10))  # centered horizontally above bar
 
-    # Health bar (inside box)
+    # Health bar
     bar_x, bar_y = box_x + 10, box_y + 35
     bar_width, bar_height = 200, 25
     pygame.draw.rect(surface, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # red background
@@ -287,18 +292,25 @@ def draw_hud(surface, level, row, col):
 
 # COLLISION & MOVEMENT
 def move_player_with_collision(dx, dy, colliders):
+    """Moves the player while preventing overlap with collidable objects."""
     player.x += dx
     for c in colliders:
         if player.colliderect(c):
-            if dx > 0: player.right = c.left
-            elif dx < 0: player.left = c.right
+            if dx > 0:
+                player.right = c.left
+            elif dx < 0:
+                player.left = c.right
+
     player.y += dy
     for c in colliders:
         if player.colliderect(c):
-            if dy > 0: player.bottom = c.top
-            elif dy < 0: player.top = c.bottom
+            if dy > 0:
+                player.bottom = c.top
+            elif dy < 0:
+                player.top = c.bottom
 
 def handle_room_transition():
+    """Handles transitions between rooms and levels based on player position."""
     global current_room
     level, row, col = current_room
 
@@ -323,7 +335,7 @@ def handle_room_transition():
         if row < GRID_HEIGHT - 1:
             current_room[1] += 1
             player.bottom = ROOM_HEIGHT
-        # if at top-right and there’s a next level → go to next level
+        # Transition to next level from top-right
         elif row == GRID_HEIGHT - 1 and col == GRID_WIDTH - 1 and level < LEVELS - 1:
             current_room = [level + 1, 0, 0]
             player.x, player.y = 50, ROOM_HEIGHT - 100
@@ -339,12 +351,15 @@ def handle_room_transition():
             player.bottom = ROOM_HEIGHT
 
 # Helper functions
-def not_collected(x, y, s): return (level, row, col, x, y) not in s
-def can_draw(x, y, s): return (level, row, col, x, y) not in s
+def not_collected(x, y, s):
+    """Checks if an item at (x, y) in the current room hasn't been collected."""
+    return (level, row, col, x, y) not in s
+def can_draw(x, y, s):
+    """Returns True if an item should be drawn (not already collected)."""
+    return (level, row, col, x, y) not in s
 
 # MAIN LOOP
 running = True
-
 while running:
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
@@ -365,9 +380,7 @@ while running:
     screen.fill((0, 0, 0))
 
     # Draw the current room
-    colliders, artifacts, gold, potions = draw_current_room(
-        screen, level, row, col, collected_artifacts, collected_gold, collected_potions
-    )
+    colliders, artifacts, gold, potions = draw_current_room(screen, level, row, col, collected_artifacts, collected_gold, collected_potions)
 
     # Player movement & transitions
     move_player_with_collision(dx, dy, colliders)
@@ -392,7 +405,6 @@ while running:
             potions.remove(p)
             inventory["Potions"] += 1
 
-    # ─────────────── Draw Everything ───────────────
     pygame.draw.rect(screen, (0, 0, 0), player)  # player
     draw_hud(screen, level, row, col)  # HUD
 
