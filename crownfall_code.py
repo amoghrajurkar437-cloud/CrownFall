@@ -1,3 +1,5 @@
+#Make sure that the folder name is Crownfall
+
 import pygame
 import os
 
@@ -410,3 +412,4 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
+
