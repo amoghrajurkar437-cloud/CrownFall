@@ -1,11 +1,12 @@
 import pygame
 import os
 
-from pygame import draw
 pygame.init()
 os.chdir(os.path.dirname(__file__))  # make working dir = script folder
 
-# Constants
+# ───────────────────────────────────────────────
+# CONSTANTS & SETUP
+# ───────────────────────────────────────────────
 ROOM_WIDTH = 800
 ROOM_HEIGHT = 600
 GRID_WIDTH = 3
@@ -13,160 +14,153 @@ GRID_HEIGHT = 3
 LEVELS = 3
 EDGE_BUFFER = 5
 
-# Setup
 screen = pygame.display.set_mode((ROOM_WIDTH, ROOM_HEIGHT))
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 30)
-current_room = [0, 0, 0]
-player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
-speed = 5
 
-# Store collidable objects for each room
+# Player setup
+player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
+speed = 20
+
+# Room system
+current_room = [0, 0, 0]
 room_colliders = {}
 
-# Functions to draw objects
-def draw_objects(x, y, width, height, surface, colliders):
-    """Draws an object (tree, rock, wall, house, etc) onto a given surface at position (x, y) with the specified dimensions (weight, height)
-    Certain object types (tree, rock, wall, house) are added to the colliders list to create collision boundaries.
-    Takes in: x, y, width, height, surface to draw on, list of colliders
-    Does: Draw the object and add to colliders if necessary"""
-    # Create rectangle for the object
-    obj_rect = pygame.Rect(x, y, width, height)
+# PLAYER HEALTH & INVENTORY
+health = 100
+max_health = 100
+inventory_visible = False
+inventory = {"Gold": 0, "Artifacts": 0, "Potions": 0}
+inventory_limit = 10
+collected_artifacts = set()
+collected_gold = set()
+collected_potions = set()
 
-    # Tree
-    if width == 180 and height == 240:
-        image = pygame.image.load("crownfall_images/Tree_1.png")
-        image = pygame.transform.scale(image, (width + 50, height + 50))
-        surface.blit(image, (x - 25, y - 25))
-        colliders.append(obj_rect)
-    # Tree 2
-    elif width == 150 and height == 200:
-        image = pygame.image.load("crownfall_images/Tree_2.png")
-        image = pygame.transform.scale(image, (width + 50, height + 50))
-        surface.blit(image, (x - 25, y - 25))
-        colliders.append(obj_rect)
-    # Rock
-    elif width == 100 and height == 100:
-        image = pygame.image.load("crownfall_images/Rock_1.png")
-        image = pygame.transform.scale(image, (width + 100, height + 100))
-        surface.blit(image, (x - 50, y - 50))
-        colliders.append(obj_rect)
-    # Rock 2
-    elif width == 50 and height == 75:
-        image = pygame.image.load("crownfall_images/Rock_2.png")
-        image = pygame.transform.scale(image, (width + 100, height + 100))
-        surface.blit(image, (x - 50, y - 50))
-        colliders.append(obj_rect)
-    # Wall
-    elif width == 150 and height == 200:
-        image = pygame.image.load("crownfall_images/Wall.png")
-        image = pygame.transform.scale(image, (width + 100, height + 100))
-        surface.blit(image, (x - 50, y - 50))
-        colliders.append(obj_rect)
-    # House
-    elif width == 300 and height == 300:
-        image = pygame.image.load("crownfall_images/House_1.png")
-        image = pygame.transform.scale(image, (width + 100, height + 100))
-        surface.blit(image, (x - 50, y - 50))
-        colliders.append(obj_rect)
-    # Big House
-    elif width == 500 and height == 250:
-        image = pygame.image.load("crownfall_images/House_2.png")
-        image = pygame.transform.scale(image, (width + 200, height + 400))
-        surface.blit(image, (x - 100, y - 200))
-        colliders.append(obj_rect)
-    # Villager
-    elif width == 100 and height == 200:
-        image = pygame.image.load("crownfall_images/Villager_1.png")
-        image = pygame.transform.scale(image, (width + 20, height + 20))
-        surface.blit(image, (x - 10, y - 10))
-        colliders.append(obj_rect)
-    # Gold -> (walkable)
-    elif width == 50 and height == 50:
-        image = pygame.image.load("crownfall_images/Gold.png")
-        image = pygame.transform.scale(image, (width + 30, height + 30))
-        surface.blit(image, (x - 15, y - 15))    
-    # Artifact -> (walkable)
-    elif width == 25 and height == 25:
-        image = pygame.image.load("crownfall_images/Artifact.png")
-        image = pygame.transform.scale(image, (width + 40, height + 40))
-        surface.blit(image, (x - 20, y - 20))
+# OBJECT DRAW FUNCTION
+def draw_objects(x, y, obj_type, surface, colliders, artifacts, gold, potions):
+    """Draws environment and collectible objects, adds colliders/pickups as needed."""
+    def load_img(name, w, h, offset=(0, 0)):
+        img = pygame.image.load(f"crownfall_images/{name}.png")
+        img = pygame.transform.scale(img, (w, h))
+        surface.blit(img, (x - offset[0], y - offset[1]))
+        return pygame.Rect(x, y, w, h)
 
-def draw_current_room(surface, level, row, col):
-    """Renders all visual elements (placeholders or objects) for the specified room in the grid.
-    Automatically updates the room_colliders dictionary with collision rectangles for that room.
-    Takes in: surface to draw on, level index, row index, column index
-    Does: Draw the room and update colliders"""
-    # Clear previous drawings
-    image = pygame.image.load("crownfall_images/Level_bg_1.jpg")
-    image = pygame.transform.scale(image, (ROOM_WIDTH, ROOM_HEIGHT))
-    surface.blit(image, (0, 0))
-    colliders = []
-    
-    #Tree: 180x240
-    #Tree 2: 150x200
-    #Rock: 100x100
-    #Rock 2: 50x75
-    #Wall: 150x200
-    #House: 300x300
-    #Big House: 500x250
-    #Villager: 100x200
-    #Gold: 50x50
-    #Artifact: 25x25
-    
-    #draw_objects(x, y, width, height, surface, colliders)
+    # Environment
+    if obj_type == "tree1":
+        rect = load_img("Tree_1", 180, 240)
+        colliders.append(rect)
+    elif obj_type == "tree2":
+        rect = load_img("Tree_2", 150, 200)
+        colliders.append(rect)
+    elif obj_type == "rock1":
+        rect = load_img("Rock_1", 100, 100)
+        colliders.append(rect)
+    elif obj_type == "rock2":
+        rect = load_img("Rock_2", 50, 75)
+        colliders.append(rect)
+    elif obj_type == "house1":
+        rect = load_img("House_1", 300, 300)
+        colliders.append(rect)
+    elif obj_type == "house2":
+        rect = load_img("House_2", 500, 250)
+        colliders.append(rect)
+    elif obj_type == "villager":
+        rect = load_img("Villager_1", 100, 200)
+        colliders.append(rect)
+
+    # Collectibles
+    elif obj_type == "artifact":
+        rect = load_img("Artifact", 40, 40)
+        artifacts.append(rect)
+    elif obj_type == "gold":
+        rect = load_img("Gold", 50, 50)
+        gold.append(rect)
+    elif obj_type == "potion":
+        rect = load_img("Potion", 40, 40)
+        potions.append(rect)
+
+# ROOM DRAW FUNCTION
+def draw_current_room(surface, level, row, col, collected_artifacts, collected_gold, collected_potions):
+    """Draws current room visuals and sets up colliders, artifacts, gold, and potions."""
+
+    bg = pygame.image.load("crownfall_images/Level_bg_1.jpg")
+    bg = pygame.transform.scale(bg, (ROOM_WIDTH, ROOM_HEIGHT))
+    surface.blit(bg, (0, 0))
+
+    # Object containers for this room
+    colliders, artifacts, gold, potions = [], [], [], []
+
     # ──────────────── LEVEL 1 ────────────────
     if level == 0 and row == 0 and col == 0:
         # Level 1 - Bottom-left room
-        draw_objects(400, 250, 300, 300, surface, colliders) # House
-        draw_objects(225, 300, 180, 240, surface, colliders) # Tree
-        draw_objects(25, 50, 100, 100, surface, colliders)  # Rock
-        draw_objects(175, 25, 50, 75, surface, colliders)  # Rock 2
-        draw_objects(600, 150, 25, 25, surface, colliders)  # Artifact
+        draw_objects(400, 250, "house1", surface, colliders, artifacts, gold, potions) # House
+        draw_objects(225, 300, "tree1", surface, colliders, artifacts, gold, potions) # Tree
+        draw_objects(25, 50, "rock1", surface, colliders, artifacts, gold, potions)  # Rock
+        draw_objects(175, 25, "rock2", surface, colliders, artifacts, gold, potions)  # Rock 2
+        if can_draw(600, 150, collected_artifacts):
+            draw_objects(600, 150, "artifact", surface, colliders, artifacts, gold, potions)  # Artifact
+
     elif level == 0 and row == 0 and col == 1:
         # Level 1 - Bottom-middle room
-        draw_objects(550, 300, 180, 240, surface, colliders)  # Tree
-        draw_objects(350, 250, 50, 75, surface, colliders)  # Rock 2
-        draw_objects(450, 100, 100, 200, surface, colliders)  # Villager
-        draw_objects(400, 500, 50, 50, surface, colliders)  # Gold
+        draw_objects(550, 300, "tree2", surface, colliders, artifacts, gold, potions)  # Tree
+        draw_objects(350, 250, "rock2", surface, colliders, artifacts, gold, potions)  # Rock 2
+        draw_objects(450, 100, "villager", surface, colliders, artifacts, gold, potions)  # Villager
+        if can_draw(400, 500, collected_gold):
+            draw_objects(400, 500, "gold", surface, colliders, artifacts, gold, potions)  # Gold
+
     elif level == 0 and row == 0 and col == 2:
         # Level 1 - Bottom-right room
-        draw_objects(350, 150, 500, 250, surface, colliders)  # Big House
-        draw_objects(100, 200, 180, 240, surface, colliders)  # Tree
-        draw_objects(450, 500, 100, 100, surface, colliders)  # Rock
-        draw_objects(700, 100, 25, 25, surface, colliders)  # Artifact
-        draw_objects(600, 400, 100, 200, surface, colliders)  # Villager
+        draw_objects(350, 150, "house2", surface, colliders, artifacts, gold, potions)  # Big House
+        draw_objects(100, 200, "tree1", surface, colliders, artifacts, gold, potions)  # Tree
+        draw_objects(450, 500, "rock1", surface, colliders, artifacts, gold, potions)  # Rock
+        draw_objects(600, 400, "villager", surface, colliders, artifacts, gold, potions)  # Villager
+        if can_draw(700, 100, collected_artifacts):
+            draw_objects(700, 100, "artifact", surface, colliders, artifacts, gold, potions)  # Artifact
+
     elif level == 0 and row == 1 and col == 0:
         # Level 1 - Middle-left room
-        draw_objects(225, 250, 180, 240, surface, colliders)  # Tree
-        draw_objects(700, 450, 50, 50, surface, colliders)  # Gold
-        draw_objects(600, 350, 100, 100, surface, colliders)  # Rock
-        draw_objects(25, 25, 100, 200, surface, colliders)  # Villager
+        draw_objects(225, 250, "tree1", surface, colliders, artifacts, gold, potions)  # Tree
+        draw_objects(600, 350, "rock1", surface, colliders, artifacts, gold, potions)  # Rock
+        draw_objects(25, 25, "villager", surface, colliders, artifacts, gold, potions)  # Villager
+        if can_draw(400, 150, collected_potions):
+            draw_objects(400, 150, "potion", surface, colliders, artifacts, gold, potions)  # Potion
+        if can_draw(700, 500, collected_gold):
+            draw_objects(700, 500, "gold", surface, colliders, artifacts, gold, potions)  # Gold
+
     elif level == 0 and row == 1 and col == 1:
         # Level 1 - Center room
-        draw_objects(400, 250, 300, 300, surface, colliders)  # House
-        draw_objects(150, 350, 180, 240, surface, colliders)  # Tree
-        draw_objects(600, 150, 50, 50, surface, colliders)  # Gold
-        draw_objects(700, 400, 25, 25, surface, colliders)  # Artifact
+        draw_objects(400, 250, "house1", surface, colliders, artifacts, gold, potions)  # House
+        draw_objects(150, 350, "tree1", surface, colliders, artifacts, gold, potions)  # Tree
+        if can_draw(600, 150, collected_gold):
+            draw_objects(600, 150, "gold", surface, colliders, artifacts, gold, potions)  # Gold
+        if can_draw(700, 400, collected_artifacts):
+            draw_objects(700, 400, "artifact", surface, colliders, artifacts, gold, potions)  # Artifact
         #Add Weapon and Enemy
+
     elif level == 0 and row == 1 and col == 2:
         # Level 1 - Middle-right room
-        draw_objects(100, 200, 50, 75, surface, colliders)  # Rock 2
+        draw_objects(100, 200, "rock2", surface, colliders, artifacts, gold, potions)  # Rock 2
         #Add Enemy and Water
+
     elif level == 0 and row == 2 and col == 0:
         # Level 1 - Top-left room
-        draw_objects(200, 225, 180, 240, surface, colliders)  # Tree
-        draw_objects(200, 150, 50, 50, surface, colliders)  # Gold
-        draw_objects(400, 400, 100, 100, surface, colliders)  # Rock
+        draw_objects(200, 225, "tree1", surface, colliders, artifacts, gold, potions)  # Tree
+        draw_objects(400, 400, "rock1", surface, colliders, artifacts, gold, potions)  # Rock
+        if can_draw(200, 150, collected_gold):
+            draw_objects(200, 150, "gold", surface, colliders, artifacts, gold, potions)  # Gold
+
     elif level == 0 and row == 2 and col == 1:
         # Level 1 - Top-middle room
-        draw_objects(600, 300, 180, 240, surface, colliders)  # Tree
-        draw_objects(200, 25, 300, 300, surface, colliders)  # House
-        draw_objects(50, 100, 50, 50, surface, colliders)  # Gold
+        draw_objects(600, 300, "tree1", surface, colliders, artifacts, gold, potions)  # Tree
+        draw_objects(200, 25, "house1", surface, colliders, artifacts, gold, potions)  # House
+        if can_draw(50, 100, collected_gold):
+            draw_objects(50, 100, "gold", surface, colliders, artifacts, gold, potions)  # Gold
         #Add Enemy
+
     elif level == 0 and row == 2 and col == 2:
         # Level 1 - Top-right room
-        draw_objects(200, 150, 50, 50, surface, colliders)  # Gold
+        if can_draw(200, 150, collected_gold):
+            draw_objects(200, 150, "gold", surface, colliders, artifacts, gold, potions)  # Gold
         #Add Final Boss
 
     # ──────────────── LEVEL 2 ────────────────
@@ -210,19 +204,22 @@ def draw_current_room(surface, level, row, col):
     elif level == 2 and row == 0 and col == 0:
         # Level 3 - Bottom-left room
         #draw_objects(550, 125, , , surface, colliders) #water
-        draw_objects(400, 300, 180, 240, surface, colliders) #tree
+        draw_objects(400, 300, "tree1", surface, colliders, artifacts, gold, potions)
 
     elif level == 2 and row == 0 and col == 1:
         # Level 3 - Bottom-middle room
-        draw_objects(100, 300, 100, 200, surface, colliders) #villager
-        draw_objects(500, 300, 100, 200, surface, colliders) #villager
-        draw_objects(601, 140, 180, 240, surface, colliders) #tree
+        draw_objects(100, 300, "villager", surface, colliders, artifacts, gold, potions)
+        draw_objects(500, 300, "villager", surface, colliders, artifacts, gold, potions)
+        draw_objects(601, 140, "tree1", surface, colliders, artifacts, gold, potions)
 
     elif level == 2 and row == 0 and col == 2:
         # Level 3 - Bottom-right room
-        draw_objects(0, 150, 150, 200, surface, colliders) #tree
-        draw_objects(700, 25, 50, 50, surface, colliders) #okane
-        #draw_objects(500, 300, , , surface, colliders) #water
+        draw_objects(0, 150, "tree1", surface, colliders, artifacts, gold, potions)
+        if can_draw(700, 25, collected_gold):
+            draw_objects(700, 25, "gold", surface, colliders, artifacts, gold, potions)
+        if can_draw(700, 500, collected_potions):
+            draw_objects(700, 500, "potion", surface, colliders, artifacts, gold, potions)  
+        #water
 
     elif level == 2 and row == 1 and col == 0:
         # Level 3 - Middle-left room
@@ -248,137 +245,156 @@ def draw_current_room(surface, level, row, col):
         # Level 3 - Top-right room
         pygame.draw.rect(surface, (128, 0, 0), (200, 150, 400, 300))
 
-    # Save room-specific colliders
-    room_colliders[(level, row, col)] = colliders
+    return colliders, artifacts, gold, potions
 
-# Movement and collision functions
+# HUD DRAW
+def draw_hud(surface, level, row, col):
+    # Health bar box (top-left)
+    box_x, box_y = 15, 10  # overall position
+    box_width, box_height = 220, 70
+    pygame.draw.rect(surface, (0, 0, 0), (box_x, box_y, box_width, box_height))  # outer black box
+    pygame.draw.rect(surface, (255, 255, 255), (box_x, box_y, box_width, box_height), 2)  # white outline
+
+    # Health label text
+    label = font.render("Health", True, (255, 255, 255))
+    surface.blit(label, (box_x + 70, box_y + 10))  # centered horizontally above bar
+
+    # Health bar (inside box)
+    bar_x, bar_y = box_x + 10, box_y + 35
+    bar_width, bar_height = 200, 25
+    pygame.draw.rect(surface, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # red background
+    pygame.draw.rect(surface, (0, 255, 0), (bar_x, bar_y, bar_width * (health / max_health), bar_height))  # green fill
+    pygame.draw.rect(surface, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)  # white outline
+
+    # Room info box (top-right)
+    text = f"Level {level + 1} - {['Bottom','Middle','Top'][row]} {['Left','Middle','Right'][col]}"
+    info = font.render(text, True, (255, 255, 255))
+    rect = info.get_rect(topright=(ROOM_WIDTH - 20, 20))
+    pygame.draw.rect(surface, (0, 0, 0), (rect.left - 10, rect.top - 5, rect.width + 20, rect.height + 10))
+    pygame.draw.rect(surface, (255, 255, 255), (rect.left - 10, rect.top - 5, rect.width + 20, rect.height + 10), 2)
+    surface.blit(info, rect)
+
+    # Inventory
+    if inventory_visible:
+        inv_rect = pygame.Rect(20, 90, 250, 120)
+        pygame.draw.rect(surface, (0, 0, 0), inv_rect)
+        pygame.draw.rect(surface, (255, 255, 255), inv_rect, 2)
+        y = 110
+        for item, count in inventory.items():
+            txt = font.render(f"{item}: {count}", True, (255, 255, 255))
+            surface.blit(txt, (40, y))
+            y += 30
+
+# COLLISION & MOVEMENT
 def move_player_with_collision(dx, dy, colliders):
-    """Moves the player rectangle based on input deltas (dx, dy) while preventing overlap with solid objects (colliders).
-    Takes in: change in x (dx), change in y (dy), list of colliders
-    Does: Move player with collision detection"""
-    # Move horizontally with collision
     player.x += dx
-    for collider in colliders:
-        if player.colliderect(collider):
-            if dx > 0:  # Moving right
-                player.right = collider.left
-            elif dx < 0:  # Moving left
-                player.left = collider.right
-
-    # Move vertically with collision
+    for c in colliders:
+        if player.colliderect(c):
+            if dx > 0: player.right = c.left
+            elif dx < 0: player.left = c.right
     player.y += dy
-    for collider in colliders:
-        if player.colliderect(collider):
-            if dy > 0:  # Moving down
-                player.bottom = collider.top
-            elif dy < 0:  # Moving up
-                player.top = collider.bottom
+    for c in colliders:
+        if player.colliderect(c):
+            if dy > 0: player.bottom = c.top
+            elif dy < 0: player.top = c.bottom
 
-def handle_room_transition(colliders):
-    """Handles movement between rooms (left, right, up, down) when the player reaches a screen edge.
-    Prevents transitions if the player is blocked by nearby colliders.
-    Also handles moving to the next level when the player exits the top-right corner of the top-right room.
-    Takes in: list of colliders
-    Does: Transition between rooms and levels"""
-    # Set up for room transition
+def handle_room_transition():
     global current_room
     level, row, col = current_room
-    buffer = EDGE_BUFFER
-
-    # If blocked by a wall/house/tree at the edge, do not transition
-    left_edge = pygame.Rect(0, player.y, buffer, player.height)
-    right_edge = pygame.Rect(ROOM_WIDTH - buffer, player.y, buffer, player.height)
-
-    # Check for blockers
-    blocked_left = any(left_edge.colliderect(c) for c in colliders)
-    blocked_right = any(right_edge.colliderect(c) for c in colliders)
 
     # Move left
-    if player.left < 0 and not blocked_left:
+    if player.left < 0:
         if col > 0:
             current_room[2] -= 1
             player.right = ROOM_WIDTH
         else:
             player.left = 0
-    elif player.left < 0:
-        player.left = 0
 
     # Move right
-    if player.right > ROOM_WIDTH and not blocked_right:
+    elif player.right > ROOM_WIDTH:
         if col < GRID_WIDTH - 1:
             current_room[2] += 1
             player.left = 0
         else:
             player.right = ROOM_WIDTH
-    elif player.right > ROOM_WIDTH:
-        player.right = ROOM_WIDTH
 
     # Move up
-    if player.top < 0:
+    elif player.top < 0:
         if row < GRID_HEIGHT - 1:
             current_room[1] += 1
             player.bottom = ROOM_HEIGHT
+        # if at top-right and there’s a next level → go to next level
+        elif row == GRID_HEIGHT - 1 and col == GRID_WIDTH - 1 and level < LEVELS - 1:
+            current_room = [level + 1, 0, 0]
+            player.x, player.y = 50, ROOM_HEIGHT - 100
         else:
             player.top = 0
 
     # Move down
-    if player.bottom > ROOM_HEIGHT:
+    elif player.bottom > ROOM_HEIGHT:
         if row > 0:
             current_room[1] -= 1
             player.top = 0
         else:
             player.bottom = ROOM_HEIGHT
-    # Special case: go to next level when near top-right corner of top-right room
-    if current_room[1] == GRID_HEIGHT - 1 and current_room[2] == GRID_WIDTH - 1:
-       if player.top < 50 and player.right > ROOM_WIDTH - 50:  # more forgiving area
-          if current_room[0] < LEVELS - 1:
-             current_room[0] += 1  # Go to next level
-             current_room[1] = 0   # Reset to bottom-left room
-             current_room[2] = 0
-             player.left = 50
-             player.top = ROOM_HEIGHT - 100
 
-#Mini map area name function
-def get_area_name(row, col):
-   """Generates a readable name for the area based on its row and column indices.
-   Takes in: row index, column index
-   Does: Return area name string"""
-   # Define names for rows and columns
-   row_names = ["Bottom", "Middle", "Top"]
-   col_names = ["Left", "Middle", "Right"]
-   return f"{row_names[row]} {col_names[col]}"
+# Helper functions
+def not_collected(x, y, s): return (level, row, col, x, y) not in s
+def can_draw(x, y, s): return (level, row, col, x, y) not in s
 
-# Game loop
+# MAIN LOOP
 running = True
+
 while running:
-    for event in pygame.event.get():
-      if event.type == pygame.QUIT:
-         running = False
+    for e in pygame.event.get():
+        if e.type == pygame.QUIT:
+            running = False
+        elif e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_e:
+                inventory_visible = not inventory_visible
 
     keys = pygame.key.get_pressed()
-    move_left  = keys[pygame.K_a] or keys[pygame.K_LEFT]
-    move_right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
-    move_up    = keys[pygame.K_w] or keys[pygame.K_UP]
-    move_down  = keys[pygame.K_s] or keys[pygame.K_DOWN]
-    dx = (move_right - move_left) * speed
-    dy = (move_down - move_up) * speed
-
+    dx = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
+    dy = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
+    dx *= speed
+    dy *= speed
 
     level, row, col = current_room
-    draw_current_room(screen, level, row, col)
-    colliders = room_colliders.get((level, row, col), [])
 
+    # Clear screen before drawing anything
+    screen.fill((0, 0, 0))
+
+    # Draw the current room
+    colliders, artifacts, gold, potions = draw_current_room(
+        screen, level, row, col, collected_artifacts, collected_gold, collected_potions
+    )
+
+    # Player movement & transitions
     move_player_with_collision(dx, dy, colliders)
-    handle_room_transition(colliders)
+    handle_room_transition()
 
-    pygame.draw.rect(screen, (0, 0, 0), player)
+    # ─────────────── Artifact Pickup ───────────────
+    for artifact in artifacts[:]:  # make a copy to modify safely
+        if player.colliderect(artifact):
+            collected_artifacts.add((level, row, col, artifact.x, artifact.y))
+            artifacts.remove(artifact)
+            inventory["Artifacts"] += 1
+    # ─────────────── Gold Pickup ───────────────
+    for g in gold[:]:
+        if player.colliderect(g):
+            collected_gold.add((level, row, col, g.x, g.y))
+            gold.remove(g)
+            inventory["Gold"] += 20
+    # ─────────────── Potion Pickup ───────────────
+    for p in potions[:]:
+        if player.colliderect(p):
+            collected_potions.add((level, row, col, p.x, p.y))
+            potions.remove(p)
+            inventory["Potions"] += 1
 
-    area_text = f"Level {level + 1} - {get_area_name(row, col)}"
-    text_surface = font.render(area_text, True, (255, 255, 255))
-    text_rect = text_surface.get_rect(topright=(ROOM_WIDTH - 10, 10))
-    screen.blit(text_surface, text_rect)
+    # ─────────────── Draw Everything ───────────────
+    pygame.draw.rect(screen, (0, 0, 0), player)  # player
+    draw_hud(screen, level, row, col)  # HUD
 
     pygame.display.flip()
     clock.tick(60)
-
-pygame.quit()
