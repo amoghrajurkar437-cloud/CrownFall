@@ -100,6 +100,11 @@ dialogues = {
         "Villager: Sebastian, do something",
         "Villager: I wanna go to sleep"
     ],
+    #LEVEL 1: Top Middle Villager
+    (0, 2, 1, 0): [
+		"Villager: Amogh, HELP MEEEEEE",
+		"Villager: Or maybe I'll go give this nice traveler the most, bestest, GREATEST weapon of all!"
+		],
 
     # LEVEL 2: bottom right villagers
     (1, 0, 2, 0): [
@@ -129,6 +134,7 @@ dialogues = {
 # Trade set up
 tradeable_villagers = { # Which villager keys are tradeable
     (0, 0, 1, 0),  # Level 1 bottom middle
+    (0, 2, 1, 0),  #LEVEL 1 Top Middle Viallager
     (1, 0, 2, 1),  # Level 2 bottom right (middle villager)
     (2, 0, 1, 0),  # Level 3 bottom middle (left villager)
 }
@@ -1177,4 +1183,5 @@ while running:
             trade_feedback_timer = 0.0
 
     pygame.display.flip()
+
 pygame.quit()
