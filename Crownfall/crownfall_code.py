@@ -136,8 +136,11 @@ dialogues = {
         "Villager: I have a headache",
         "Villager: I need water"],
     (2, 0, 1, 1): [
-        "Villager: Pokemon",
-        "Villager: Knock, Knick. Whos there. IDK"],
+        "Villager: Pokemon, got to catch 'em all!",
+        "You: What?",
+        "Villager: Knock, Knick. Whos there. IDK",
+        "You: Weirdo"
+	],
 }
 
 # Trade set up
@@ -1530,3 +1533,4 @@ while running:
     pygame.display.flip()
 
 pygame.quit()
+
