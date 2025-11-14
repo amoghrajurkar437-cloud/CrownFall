@@ -102,6 +102,12 @@ current_dialogue = []
 
 # Key format = (level, row, column, villager_index)
 dialogues = {
+    #LEVEL 1: Bottom Left Villager
+	(0, 0, 0, 0): [
+		"Villager: The stranger at the edge of town has been brandishing his sword all day. I wonder how he keeps it so clean.",
+		"You: I'll have to go check that out. I'll keep you posted.",
+		"Villager: Thank you! If you manage to remove him from stoping our trade routes, I'll give you something in return."
+		],
     # LEVEL 1: bottom middle villager
     (0, 0, 1, 0): [
         "Villager: LALALA!",
@@ -288,6 +294,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         draw_objects(175, 25, "rock2", surface)    # Rock 2
         if can_draw(600, 150, c_Artifacts):
             draw_objects(600, 150, "artifact", surface)  # Artifact
+        draw_objects(675, 380, "villager", surface) #Villager
 
     # Level 1: Bottom Middle
     elif level == 0 and row == 0 and col == 1:
@@ -328,6 +335,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(600, 150, "gold", surface)  # Gold
         if can_draw(700, 400, c_Artifacts):
             draw_objects(700, 400, "artifact", surface)  # Artifact
+        draw_objects(325, 350, "villager", surface) #Villager
 
     # Level 1: Middle Right
     elif level == 0 and row == 1 and col == 2:
@@ -335,6 +343,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(500, 250, c_Speed_Potions):
             draw_objects(500, 250, "speed_potion", surface)  # Speed Potion
         draw_objects(400, 400, "water", surface)  # Water
+        draw_objects(550, 375, "villager", surface) #villager
 
     # Level 1: Top Left
     elif level == 0 and row == 2 and col == 0:
@@ -352,6 +361,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(100, 200, "health_potion", surface)  # Health Potion
         if can_draw(50, 100, c_Gold):
             draw_objects(50, 100, "gold", surface)  # Gold
+        draw_objects(500, 150, "villager", surface) #Villager
 
     # Level 1: Top Right
     elif level == 0 and row == 2 and col == 2:
@@ -1518,4 +1528,5 @@ while running:
             feedback = ""
 
     pygame.display.flip()
+
 pygame.quit()
