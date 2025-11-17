@@ -103,41 +103,90 @@ current_dialogue = []
 
 # Key format = (level, row, column, villager_index)
 dialogues = {
+#LEVEL 1: Bottom Left Villager
+    (0, 0, 0, 0): [
+        "Villager: The stranger at the edge of town has been brandishing his sword all day. I wonder how he keeps it so clean.",
+        "You: I'll have to go check that out. I'll keep you posted.",
+        "Villager: Thank you! If you manage to remove him from stoping our trade routes, I'll give you something in return."
+    ],
     # LEVEL 1: bottom middle villager
     (0, 0, 1, 0): [
         "Villager: LALALA!",
-        "Villager: BLA BLA",
-        "Villager: Bye!"],
+        "Villager: What are you looking at?",
+        "You: Nothing, but you're kinda deranged",
+        "Villager: Well I can't help but go insane after this new king just stole all of our money!",
+        "Villager: I'M GOING TO GO BROKE!!",
+        "You: ...",
+        "Villager: BLA BLA"
+    ],
     # LEVEL 1: middle left villager
     (0, 1, 0, 0): [
-        "Villager: STORY THINGS",
-        "Villager: More story things"],
+        "Villager: There is a strange looking guy at the edge of the town, he seems like hes a part of the new clan.",
+        "Villager: He's stopping all of us from leaving to other towns! :("
+    ],
     # LEVEL 1: bottom right villager
     (0, 0, 2, 0): [
-        "Villager: Sebastian, do something",
-        "Villager: I wanna go to sleep"],
+        "Villager: Sebastian, DO SOMETHING!!",
+        "You: Who is Sebastian?",
+        "Villager: I wanna go to sleep :("
+    ],
+    #LEVEL 1: Top Middle Villager
+    (0, 2, 1, 0): [
+        "Villager: Amogh, HELP MEEEEEE",
+        "Villager: Or maybe I'll go give this nice traveler the most, bestest, GREATEST weapon of all!"
+    ],
+    #LEVEL 1: Middle Right Villager
+    (0, 1, 2, 0): [
+        "Villager: Help, I'm under the water. Please help me.",
+        "Villager: But if you give me some money, I could save myself."
+    ],
+    #LEVEL 1: Middle Middle Villager
+    (0, 1, 1, 0): [
+        "Villager: The Grand Tree. It's been here since I was a kid, my dad was a kid, my grandfather. I think it's been here forever honestly.",
+        "You: Yah...I'm not so sure. Seems like it just grew overnight. The bark doesn't look old enough.",
+        "Villager: YOU DON'T KNOW  WHAT I KNOW!"
+    ],
+
     # LEVEL 2: bottom right villagers
     (1, 0, 2, 0): [
         "Villager: I don't have a normal sleep schedule",
-        "Villager: It's 4:12 am right now"],
+        "Villager: It's 4:12 am right now",
+        "Villager: Through the window, through the wall, till the sweat runs down my skull",
+        "Villager: 'till all these screeches crawl"
+    ],
     (1, 0, 2, 1): [
         "Villager: I am hungry",
-        "Villager: I need to get some food"],
+        "You: I have some food, you want it?",
+        "Villager: I don't want your food, it could have... poison...",
+        "Villager: I'm going to the tavern later to get some food, but thanks"
+    ],
     (1, 0, 2, 2): [
-        "Villager: AI is going to take my job",
-        "Villlager: Im going to be jobless if I pick this as my job"],
+        "Villager: The gaurds are going to take my job",
+        "Villlager: Im going to be jobless soon enough, I already lost my children and my wife",
+        "Villager: When she left that day, to be with the drowibng guy, it hurt my soul"
+        "You: Well nothing can take your job of beating Helldivers"
+        "Villager: True"
+    ],
+
     # LEVEL 3: bottom middle villagers
     (2, 0, 1, 0): [
         "Villager: I have a headache",
-        "Villager: I need water"],
+        "Villager: I need water",
+        "You: You should go to the other town, this guy was just drowing in the water, heh...heh...",
+    ],
     (2, 0, 1, 1): [
-        "Villager: Pokemon",
-        "Villager: Knock, Knick. Whos there. IDK"],
+        "Villager: Pokemon, got to catch 'em all!",
+        "You: What?",
+        "Villager: Knock, Knick. Whos there. IDK",
+        "You: Weirdo"
+    ],
 }
 
 # Trade set up
 tradeable_villagers = { # Which villager keys are tradeable
     (0, 0, 1, 0),  # Level 1 bottom middle
+    (0, 2, 1, 0),  # Level 1 Top Middle Villager
+    (0, 1, 2, 0),  #Level 1 Middle Right Villager
     (1, 0, 2, 1),  # Level 2 bottom right (middle villager)
     (2, 0, 1, 0),  # Level 3 bottom middle (left villager)
 }
@@ -266,7 +315,8 @@ def draw_objects(x, y, obj_type, surface):
 def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     """Draws the current room based on the level, row, and column.  2
     Adds interactive and environmental objects to their respective lists."""
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, upgrade_hut_tiles
+
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles
 
     # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg").convert()
@@ -274,13 +324,13 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     surface.blit(bg, (0, 0))
 
     # Object containers for this room
-    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, upgrade_hut_tiles = [], [], [], [], [], [], [], [], []
+    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles = [], [], [], [], [], [], [], []
 
-    def can_draw(anchor_x, anchor_y, set):
+    def can_draw(anchor_x, anchor_y, sset):
         """checks if a collectable should be drawn on the screen"""
-        return (level, row, col, anchor_x, anchor_y) not in set
+        return (level, row, col, anchor_x, anchor_y) not in sset
 
-    # ----- LEVEL 1 -----
+    # ───────── LEVEL 1 (level == 0)
     # Level 1 Bottom Left
     if level == 0 and row == 0 and col == 0:
         draw_objects(400, 250, "house1", surface)  # House 1
@@ -289,6 +339,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         draw_objects(175, 25, "rock2", surface)    # Rock 2
         if can_draw(600, 150, c_Artifacts):
             draw_objects(600, 150, "artifact", surface)  # Artifact
+        draw_objects(675, 380, "villager", surface) #Villager
 
     # Level 1: Bottom Middle
     elif level == 0 and row == 0 and col == 1:
@@ -329,6 +380,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(600, 150, "gold", surface)  # Gold
         if can_draw(700, 400, c_Artifacts):
             draw_objects(700, 400, "artifact", surface)  # Artifact
+        draw_objects(325, 350, "villager", surface) #Villager
 
     # Level 1: Middle Right
     elif level == 0 and row == 1 and col == 2:
@@ -336,12 +388,12 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(500, 250, c_Speed_Potions):
             draw_objects(500, 250, "speed_potion", surface)  # Speed Potion
         draw_objects(400, 400, "water", surface)  # Water
+        draw_objects(550, 375, "villager", surface) #villager
 
     # Level 1: Top Left
     elif level == 0 and row == 2 and col == 0:
         draw_objects(220, 245, "tree1", surface)  # Tree 1
         draw_objects(400, 400, "rock1", surface)  # Rock 1
-        draw_objects(400, 100, "upgrade_hut", surface) # Upgrade hut
         if can_draw(200, 150, c_Gold):
             draw_objects(200, 150, "gold", surface)  # Gold
 
@@ -353,13 +405,14 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(100, 200, "health_potion", surface)  # Health Potion
         if can_draw(50, 100, c_Gold):
             draw_objects(50, 100, "gold", surface)  # Gold
+        draw_objects(500, 150, "villager", surface) #Villager
 
     # Level 1: Top Right
     elif level == 0 and row == 2 and col == 2:
         if can_draw(200, 150, c_Gold):
             draw_objects(200, 150, "gold", surface)  # Gold
 
-    # ----- LEVEL 2 -----
+    # ───────── LEVEL 2 (level == 1)
     # Level 2: Bottom Left
     if level == 1 and row == 0 and col == 0:
         draw_objects(620, 420, "tree2", surface)  # Tree 2
@@ -419,7 +472,6 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         draw_objects(400, 0, "wall1", surface) # Wall 1
         draw_objects(600, 0, "wall1", surface) # Wall 1
         draw_objects(100, 350, "tree1", surface) # Tree 1
-        draw_objects(550, 400, "upgrade_hut", surface) # Upgrade hut
         if can_draw(500, 300, c_Artifacts):
             draw_objects(500, 300, "artifact", surface) # Artifact
 
@@ -452,7 +504,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
 
-    # ----- LEVEL 3 -----
+    # ───────── LEVEL 3 (level == 2)
     # Level 3: Bottom Left
     if level == 2 and row == 0 and col == 0:
         draw_objects(200, 300, "tree1", surface) # Tree 1
@@ -480,9 +532,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     # Level 3: Middle Left
     elif level == 2 and row == 1 and col == 0:
         draw_objects(400, 300, "rock2", surface) # Rock 2
-        draw_objects(170, 170, "tree2", surface) # Tree 2
-        draw_objects(400, 100, "upgrade_hut", surface) # Upgrade hut
-
+        draw_objects(170, 170, "tree2", surface) # Tree 3
         if can_draw(350, 200, c_Health_Potions):
             draw_objects(350, 200, "health_potion", surface) # Health Potion
 
@@ -495,7 +545,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     # Level 3: Middle Right
     elif level == 2 and row == 1 and col == 2:
         draw_objects(220, 320, "tree2", surface) # Tree
-        if can_draw(50, 100, c_Health_Potions): 
+        if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
         if can_draw(500, 200, c_Gold):
             draw_objects(500, 200, "gold", surface) # Gold
@@ -528,9 +578,11 @@ def draw_hud(surface):
     if not hud_visible:
         return  # Don't draw anything if HUD is hidden
 
-    global map_visible
+    global map_visible, trading_prompt_active
     if map_visible:
         map_visible = not map_visible # Turn off map when HUD is visible
+    elif trading_prompt_active:
+        trading_prompt_active = not trading_prompt_active
 
     draw_overlay(surface)
 
@@ -1104,11 +1156,6 @@ def draw_dialogue(surface):
         t_surf = font.render(l.strip(), True, (255, 255, 255))
         surface.blit(t_surf, (box_x + 20, y))
         y += font.get_height() + 5
-
-    # Hint to continue (subtle)
-    hint = font.render("Right-click to continue...", True, (180, 180, 180))
-    hint_rect = hint.get_rect(bottomright=(box_x + box_width - 12, box_y + box_height - 8))
-    surface.blit(hint, hint_rect)
 
 # COLLISION
 def colllision_check(dx, dy, coll_list):
