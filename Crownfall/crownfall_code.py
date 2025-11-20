@@ -19,7 +19,7 @@ title_font = pygame.font.SysFont(None, 80)
 
 # Player and Room setup@
 player = pygame.Rect(50, ROOM_HEIGHT - 100, 50, 50)
-player_speed = 10
+player_speed = 20
 facing = "up" # Track direction player is facing
 player_color = (255, 255, 0)
 current_room = [0, 0, 0]
@@ -96,6 +96,7 @@ strength_potions = []
 water_tiles = []
 villager_tiles = []
 upgrade_hut_tiles = []
+illager_tiles = []
 
 # Dialogue set up
 dialogue_index = 0
@@ -202,7 +203,7 @@ upgrade_costs_tokens = [1, 2, 3, 4, 5]     # Token cost per level
 def draw_objects(x, y, obj_type, surface):
     """Draws an object on the game surface and adds its collider or collectible
     reference to the appropriate list based on object type."""
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, illager_tiles
 
     def load_img(name, w, h, offset=(0, 0)):
         """Loads, scales, trims transparent padding, draws the image and returns the rect."""
@@ -286,6 +287,11 @@ def draw_objects(x, y, obj_type, surface):
         colliders.append(rect)
         upgrade_hut_tiles.append(rect)
         return rect
+    elif obj_type == "illager":
+        rect = load_img("Archie", 524, 800)
+        colliders.append(rect)
+        illager_tiles.append(rect)
+        return rect 
 
     # Collectibles 
     elif obj_type == "artifact":
@@ -316,7 +322,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     """Draws the current room based on the level, row, and column.  2
     Adds interactive and environmental objects to their respective lists."""
 
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, illager_tiles
 
     # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg").convert()
@@ -324,7 +330,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     surface.blit(bg, (0, 0))
 
     # Object containers for this room
-    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles = [], [], [], [], [], [], [], []
+    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, illager_tiles = [], [], [], [], [], [], [], [], []
 
     def can_draw(anchor_x, anchor_y, sset):
         """checks if a collectable should be drawn on the screen"""
@@ -411,6 +417,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 0 and row == 2 and col == 2:
         if can_draw(200, 150, c_Gold):
             draw_objects(200, 150, "gold", surface)  # Gold
+        draw_objects(189, -200, "illager", surface)    #Boss Illager
 
     # ───────── LEVEL 2 (level == 1)
     # Level 2: Bottom Left
