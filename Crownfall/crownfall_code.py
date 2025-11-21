@@ -14,12 +14,12 @@ MAX_UPGRADE_LEVEL = 5
 # Basic set up
 screen = pygame.display.set_mode((ROOM_WIDTH, ROOM_HEIGHT))
 clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 35)
-title_font = pygame.font.SysFont(None, 80)
+font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 20)
+title_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 80)
 
-# Player and Room setup@
+# Player and Room setup
 player = pygame.Rect(50, ROOM_HEIGHT - 100, 50, 50)
-player_speed = 20
+player_speed = 10
 facing = "up" # Track direction player is facing
 player_color = (255, 255, 0)
 current_room = [0, 0, 0]
@@ -66,6 +66,7 @@ trading_prompt_active = False # Trade prompt not showing
 trade_menu_active = False # Trade menu closed
 upgrade_menu_active = False # Uograde menu closed
 instructions_active = False # Instructions screen flag
+loading_screen_active = False # Loading screen flag
 trade_prompt_key = None # Tracks which villager is offering trade
 trade_pending_key = None # Marks villager to show trade prompt after dialogue
 active_villager_index = None # Which villager for multiple in a room
@@ -96,7 +97,6 @@ strength_potions = []
 water_tiles = []
 villager_tiles = []
 upgrade_hut_tiles = []
-enemy_tiles = []
 
 # Dialogue set up
 dialogue_index = 0
@@ -203,7 +203,7 @@ upgrade_costs_tokens = [1, 2, 3, 4, 5]     # Token cost per level
 def draw_objects(x, y, obj_type, surface):
     """Draws an object on the game surface and adds its collider or collectible
     reference to the appropriate list based on object type."""
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles
 
     def load_img(name, w, h, offset=(0, 0)):
         """Loads, scales, trims transparent padding, draws the image and returns the rect."""
@@ -272,6 +272,11 @@ def draw_objects(x, y, obj_type, surface):
         colliders.append(rect)
         return rect
     
+    # Walk through decor
+    elif obj_type == "path":
+        rect = load_img("Path", 100, 100)
+        return rect
+    
     # Interactables 
     elif obj_type == "villager":
         rect = load_img("Villager", 100, 200)
@@ -287,20 +292,6 @@ def draw_objects(x, y, obj_type, surface):
         colliders.append(rect)
         upgrade_hut_tiles.append(rect)
         return rect
-   
-   
-   #Enemy Interactables
-    elif obj_type == "illager":
-        rect = load_img("Archie", 524, 800)
-        colliders.append(rect)
-        enemy_tiles.append(rect)
-        return rect 
-    elif obj_type == "king":
-        rect = load_img("kingtower2", 250, 300)
-        colliders.append(rect)
-        enemy_tiles.append(rect)
-        return rect
-        
 
     # Collectibles 
     elif obj_type == "artifact":
@@ -331,7 +322,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     """Draws the current room based on the level, row, and column.  2
     Adds interactive and environmental objects to their respective lists."""
 
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles
 
     # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg").convert()
@@ -339,7 +330,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     surface.blit(bg, (0, 0))
 
     # Object containers for this room
-    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles = [], [], [], [], [], [], [], [], []
+    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles = [], [], [], [], [], [], [], []
 
     def can_draw(anchor_x, anchor_y, sset):
         """checks if a collectable should be drawn on the screen"""
@@ -348,6 +339,10 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     # ───────── LEVEL 1 (level == 0)
     # Level 1 Bottom Left
     if level == 0 and row == 0 and col == 0:
+        for x in [130, 230, 330, 430, 530]:
+            draw_objects(x, 625, "path", surface) # Path
+        for x in [530, 630, 730]:
+            draw_objects(x, 525, "path", surface) # Path
         draw_objects(400, 250, "house1", surface)  # House 1
         draw_objects(245, 320, "tree1", surface)   # Tree 1
         draw_objects(25, 50, "rock1", surface)     # Rock 1
@@ -358,6 +353,13 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Bottom Middle
     elif level == 0 and row == 0 and col == 1:
+        for x in [0,100,200,300,400]:
+            draw_objects(x, 525, "path", surface) # Path
+        # vertical column of paths at x=400
+        for y in [525,425,325,225,125,25,0]:
+            draw_objects(400, y, "path", surface) # Path
+        for x in [500,600,700]:
+            draw_objects(x, 525, "path", surface) # Path
         draw_objects(570, 320, "tree2", surface)  # Tree 2
         draw_objects(350, 250, "rock2", surface)  # Rock 2
         draw_objects(450, 100, "villager", surface)  # Villager
@@ -370,6 +372,11 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Bottom Right
     elif level == 0 and row == 0 and col == 2:
+        for x in [0,100,200,300]:
+            draw_objects(x, 525, "path", surface) # Path
+        draw_objects(400, 500, "path", surface) # Path
+        draw_objects(500, 475, "path", surface) # Path
+        draw_objects(600, 450, "path", surface) # Path
         draw_objects(350, 150, "house2", surface)  # House 2
         draw_objects(120, 220, "tree1", surface)   # Tree 1
         draw_objects(450, 500, "rock1", surface)   # Rock 1
@@ -379,6 +386,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Middle Left
     elif level == 0 and row == 1 and col == 0:
+        for x in [700,600,500]:
+            draw_objects(x, 525, "path", surface) # Path
         draw_objects(245, 270, "tree1", surface)  # Tree 1
         draw_objects(600, 350, "rock1", surface)  # Rock 1
         draw_objects(25, 25, "villager", surface)  # Villager
@@ -389,6 +398,12 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Middle
     elif level == 0 and row == 1 and col == 1:
+        for x in [0,100,200,300,400,500,600,700]:
+            draw_objects(x, 525, "path", surface) # Path
+        for y in [425,325,225,125,25,0]:
+            draw_objects(100, y, "path", surface) # Path
+        draw_objects(400, 700, "path", surface) # Path
+        draw_objects(400, 600, "path", surface) # Path
         draw_objects(400, 250, "house1", surface)  # House 1
         draw_objects(150, 180, "tree1", surface)   # Tree 1
         if can_draw(600, 150, c_Gold):
@@ -399,6 +414,10 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Middle Right
     elif level == 0 and row == 1 and col == 2:
+        for x in [0,100,200,300]:
+            draw_objects(x, 525, "path", surface) # Path
+        for y in [425,325]:
+            draw_objects(300, y, "path", surface) # Path
         draw_objects(100, 200, "rock2", surface)  # Rock 2
         if can_draw(500, 250, c_Speed_Potions):
             draw_objects(500, 250, "speed_potion", surface)  # Speed Potion
@@ -407,13 +426,20 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Top Left
     elif level == 0 and row == 2 and col == 0:
+        for x in [700,600,500,450]:
+            draw_objects(x, 300, "path", surface) # Path
         draw_objects(220, 245, "tree1", surface)  # Tree 1
         draw_objects(400, 400, "rock1", surface)  # Rock 1
+        draw_objects(400, 50, "upgrade_hut", surface) # Upgrade Hut
         if can_draw(200, 150, c_Gold):
             draw_objects(200, 150, "gold", surface)  # Gold
 
     # Level 1: Top Middle
     elif level == 0 and row == 2 and col == 1:
+        for y in [700,600,500,400,300]:
+            draw_objects(100, y, "path", surface) # Path
+        for x in [200,300,400,500,0]:
+            draw_objects(x, 300, "path", surface) # Path (note includes 000 -> 0)
         draw_objects(620, 170, "tree2", surface)  # Tree 2
         draw_objects(200, 25, "house1", surface)  # House 1
         if can_draw(100, 200, c_Health_Potions):
@@ -426,11 +452,12 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 0 and row == 2 and col == 2:
         if can_draw(200, 150, c_Gold):
             draw_objects(200, 150, "gold", surface)  # Gold
-        draw_objects(189, -200, "illager", surface)    #Boss Illager
 
     # ───────── LEVEL 2 (level == 1)
     # Level 2: Bottom Left
     if level == 1 and row == 0 and col == 0:
+        for x in [500,600,700]:
+            draw_objects(x, 600, "path", surface) # Path
         draw_objects(620, 420, "tree2", surface)  # Tree 2
         if can_draw(100, 100, c_Gold):
             draw_objects(100, 100, "gold", surface)  # Gold
@@ -439,25 +466,32 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Bottom Middle
     elif level == 1 and row == 0 and col == 1:
+        for x in [0,100,200,300,400,500]:
+            draw_objects(x, 600, "path", surface) # Path
+        for y in [500,400,300,200,100,0]:
+            draw_objects(500, y, "path", surface) # Path
+        for x in [600,700]:
+            draw_objects(x, 200, "path", surface) # Path
         draw_objects(400, 300, "rock2", surface)  # Rock 2
         draw_objects(200, 170, "tree1", surface)  # Tree 1
 
     # Level 2: Bottom Right
     elif level == 1 and row == 0 and col == 2:
-        draw_objects(-200, 200, "wall1", surface) # Wall 1
-        draw_objects(0, 200, "wall1", surface) # Wall 1
-        draw_objects(200, 200, "wall1", surface) # Wall 1
-        draw_objects(600, 200, "wall1", surface) # Wall 1
-        draw_objects(-130, 500, "wall2", surface) # Wall 2
-        draw_objects(-130, 450, "wall2", surface) # Wall 2
-        draw_objects(-130, 400, "wall2", surface) # Wall 2
-        draw_objects(-130, 350, "wall2", surface) # Wall 2
+        for x in [0,100,200]:
+            draw_objects(x, 200, "path", surface) # Path
+        for x in [-200,0,200,600]:
+            draw_objects(x, 200, "wall1", surface) # Wall 1
+        for y in [500,450,400,350]:
+            draw_objects(-130, y, "wall2", surface) # Wall 2
         draw_objects(200, 400, "villager", surface) # Villager
         draw_objects(400, 350, "villager", surface) # Villager
         draw_objects(650, 400, "villager", surface) # Villager
 
     # Level 2: Middle Left
     elif level == 1 and row == 1 and col == 0:
+        for x in [700,600]:
+            draw_objects(x, 300, "path", surface) # Path
+        draw_objects(400, 100, "upgrade_hut", surface) # Upgrade
         draw_objects(300, 250, "rock1", surface) # Rock 1
         draw_objects(520, 420, "tree2", surface) # Tree 2
         draw_objects(715, 0, "wall1", surface) # Wall 1
@@ -471,10 +505,12 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Middle
     elif level == 1 and row == 1 and col == 1:
-        draw_objects(-100, 0, "wall1", surface) # Wall 1
-        draw_objects(0, 0, "wall1", surface) # Wall 1
-        draw_objects(200, 0, "wall1", surface) # Wall 1
-        draw_objects(600, 0, "wall1", surface) # Wall 1
+        for y in [700,600,500,400,300,200]:
+            draw_objects(500, y, "path", surface) # Path
+        for x in [0,100,200,300,400]:
+            draw_objects(x, 300, "path", surface) # Path
+        for x in [-100,0,200,600]:
+            draw_objects(x, 0, "wall1", surface) # Wall 1
         if can_draw(400, 400, c_Health_Potions):
             draw_objects(400, 400, "health_potion", surface) # Health Potion
         if can_draw(700, 200, c_Gold):
@@ -482,21 +518,16 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Middle Right
     elif level == 1 and row == 1 and col == 2:
-        draw_objects(-100, 0, "wall1", surface) # Wall 1
-        draw_objects(0, 0, "wall1", surface) # Wall 1
-        draw_objects(200, 0, "wall1", surface) # Wall 1
-        draw_objects(400, 0, "wall1", surface) # Wall 1
-        draw_objects(600, 0, "wall1", surface) # Wall 1
+        for x in [-100,0,200,400,600]:
+            draw_objects(x, 0, "wall1", surface) # Wall 1
         draw_objects(100, 350, "tree1", surface) # Tree 1
         if can_draw(500, 300, c_Artifacts):
             draw_objects(500, 300, "artifact", surface) # Artifact
 
     # Level 2: Top Left
     elif level == 1 and row == 2 and col == 0:
-        draw_objects(600, -200, "wall2", surface) # Wall 2
-        draw_objects(600, 0, "wall2", surface) # Wall 2
-        draw_objects(600, 200, "wall2", surface) # Wall 2
-        draw_objects(600, 400, "wall2", surface) # Wall 2
+        for y in [-200,0,200,400]:
+            draw_objects(600, y, "wall2", surface) # Wall 2
         draw_objects(400, 300, "rock1", surface) # Rock 1
         draw_objects(220, 220, "tree2", surface) # Tree 2
         if can_draw(450, 100, c_Artifacts):
@@ -516,10 +547,9 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     # Level 2: Top Right
     elif level == 1 and row == 2 and col == 2:
         if can_draw(400, 300, c_Gold):
-            draw_objects(400, 750, "gold", surface) # Gold
+            draw_objects(400, 300, "gold", surface) # Gold
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
-            draw_objects(150, 200, "king", surface) #He he he Ha!
 
     # ───────── LEVEL 3 (level == 2)
     # Level 3: Bottom Left
@@ -815,12 +845,12 @@ def draw_trade_menu(surface):
         y += 40
 
     # Draw in-menu feedback
-    feedback_y = y + 6
+    feedback_y = y + 5
     if feedback:
         fb_surf = font.render(feedback, True, (255, 255, 255))
         fb_rect = fb_surf.get_rect(center=(box_x + box_w // 2, feedback_y))
         surface.blit(fb_surf, fb_rect)
-    inventory_top = feedback_y + 40
+    inventory_top = feedback_y + 50
 
     # INVENTORY title
     inventory_title = title_font.render("INVENTORY", True, (255, 255, 255))
@@ -1053,7 +1083,7 @@ def draw_instructions(surface):
     pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 3)
 
     # Title
-    hdr = title_font.render("HOW TO PLAY", True, (255, 255, 255))
+    hdr = title_font.render("CONTROLS", True, (255, 255, 255))
     surface.blit(hdr, hdr.get_rect(center=(x + w//2, y + 40)))
 
     # Controls text
@@ -1066,7 +1096,8 @@ def draw_instructions(surface):
         "Toggle Map:  M",
         "Interact / Talk:  Right-Click",
         "Close Menus: ESC",
-        "",
+        "Back to Home: Right ALT"
+        " ",
         "Collect resources by walking over them.",
         "Open SHOP use UP/DOWN to select",
         "Open UPGRADES use LEFT/RIGHT to select"
@@ -1081,6 +1112,41 @@ def draw_instructions(surface):
     # Closing hint / buttons
     hint = font.render("Press ESC to return", True, (180, 180, 180))
     surface.blit(hint, hint.get_rect(center=(x + w//2, y + h - 36)))
+
+# DRAWING LOADING SCREEN
+def draw_loading_screen(surface):
+    """Loading screen with lore + waits for SPACE to continue."""
+    draw_overlay(surface)
+
+    w, h = 720, 520
+    x = (ROOM_WIDTH - w) // 2
+    y = (ROOM_HEIGHT - h) // 2
+    panel = pygame.Surface((w, h), pygame.SRCALPHA)
+    panel.fill((12, 12, 18, 240))
+    surface.blit(panel, (x, y))
+    pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 3)
+
+    title = title_font.render("CROWNFALL", True, (255, 255, 255))
+    surface.blit(title, title.get_rect(center=(x + w//2, y + 60)))
+
+    lore = [
+        "The kingdom has collapsed under the rule of a corrupt king.",
+        "Villages have been drained of resources. Trade has been blocked.",
+        "Travelers vanish. Rumors spread of strange forces rising.",
+        "",
+        "Your mission:",
+        "- Explore the 3 regions",
+        "- Gather gold, artifacts, and potions",
+        "- Upgrade your gear",
+        "- Restore balance to the land",
+        "",
+        "Press SPACE to begin..."
+    ]
+
+    start_y = y + 150
+    for i, line in enumerate(lore):
+        txt = font.render(line, True, (255, 255, 255))
+        surface.blit(txt, (x + 40, start_y + i * 32))
 
 # DRAWING MINIMAP
 def draw_minimap(surface, level, row, col):
@@ -1195,49 +1261,73 @@ def colllision_check(dx, dy, coll_list):
 
 # MOVEMENT
 def room_transition():
-    """Handles transitions between rooms and levels based on player position."""
     global current_room
     level, row, col = current_room
 
-    # Move left
-    if player.left < 0:
-        if col > 0:
-            current_room[2] -= 1
-            player.right = ROOM_WIDTH
-        else:
-            player.left = 0
+    # --- NORMAL ROOM TRANSITIONS ---
+    # These run ONLY if NOT at a level-transition corner
 
-    # Move right
-    elif player.right > ROOM_WIDTH:
-        if col < GRID_WIDTH - 1:
-            current_room[2] += 1
-            player.left = 0
-        else:
-            player.right = ROOM_WIDTH
+    at_top    = player.top <= 0
+    at_bottom = player.bottom >= ROOM_HEIGHT
+    at_left   = player.left <= 0
+    at_right  = player.right >= ROOM_WIDTH
 
-    # Move up
-    elif player.top < 0:
-        if row < GRID_HEIGHT - 1:
-            current_room[1] += 1
-            player.bottom = ROOM_HEIGHT
-        # Transition to NEXT level from top-right room
-        elif row == GRID_HEIGHT - 1 and col == GRID_WIDTH - 1 and level < LEVELS - 1:
-            current_room = [level + 1, 0, 0]
-            player.x, player.y = 50, ROOM_HEIGHT - 100
-        else:
-            player.top = 0
+    # top-right of top-right room
+    at_level_up_corner = (level < LEVELS - 1 and row == GRID_HEIGHT - 1 and col == GRID_WIDTH - 1 and at_top and at_right)
 
-    # Move down
-    elif player.bottom > ROOM_HEIGHT:
-        if row > 0:
-            current_room[1] -= 1
-            player.top = 0
-        # Transition BACK a level from bottom-left room
-        elif row == 0 and col == 0 and level > 0:
-            current_room = [level - 1, GRID_HEIGHT - 1, GRID_WIDTH - 1]
-            player.x, player.y = ROOM_WIDTH - 150, 50
-        else:
-            player.bottom = ROOM_HEIGHT
+    # bottom-left of bottom-left room
+    at_level_down_corner = (level > 0 and row == 0 and col == 0 and at_bottom and at_left)
+
+    # If NOT at a level-transition corner, allow normal room movement
+    if not at_level_up_corner and not at_level_down_corner:
+
+        # LEFT movement
+        if at_left:
+            if col > 0:
+                current_room[2] -= 1
+                player.right = ROOM_WIDTH
+            else:
+                player.left = 0
+
+        # RIGHT movement
+        if at_right:
+            if col < GRID_WIDTH - 1:
+                current_room[2] += 1
+                player.left = 0
+            else:
+                player.right = ROOM_WIDTH
+
+        # UP movement
+        if at_top:
+            if row < GRID_HEIGHT - 1:
+                current_room[1] += 1
+                player.bottom = ROOM_HEIGHT
+            else:
+                player.top = 0
+
+        # DOWN movement
+        if at_bottom:
+            if row > 0:
+                current_room[1] -= 1
+                player.top = 0
+            else:
+                player.bottom = ROOM_HEIGHT
+
+    # --- LEVEL TRANSITIONS ---
+
+    # Next Level
+    if at_level_up_corner:
+        current_room = [level + 1, 0, 0]  # go to bottom-left of next level
+        player.x = 50
+        player.y = ROOM_HEIGHT - 100
+        return
+
+    # Previous Level
+    if at_level_down_corner:
+        current_room = [level - 1, GRID_HEIGHT - 1, GRID_WIDTH - 1]  # go to top-right of previous level
+        player.x = ROOM_WIDTH - player.width - 50
+        player.y = 50
+        return
 
 # Helper to draw dark overlay
 def draw_overlay(surface):
@@ -1290,17 +1380,29 @@ while running:
         if event.type == pygame.QUIT:
             running = False
             break
-        
-        # ----- Home Screen Start -----
+
         if on_home and event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
             on_home = False
-            player.x, player.y = 50, ROOM_HEIGHT - 100
+            loading_screen_active = True
+            continue
         
-        if instructions_active:
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                instructions_active = False
+        if not on_home and event.type == pygame.KEYDOWN and event.key == pygame.K_RALT:
+            on_home = True
+            loading_screen_active = False
+            instructions_active = False
+            continue
+        
+        if instructions_active and event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            instructions_active = False
+            on_home = True
+            continue
 
-            # If instructions menu is active, do NOT let other events run  
+        # LOADING SCREEN EVENT HANDLING
+        if loading_screen_active:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                loading_screen_active = False
+                on_home = False
+                player.x, player.y = 50, ROOM_HEIGHT - 100
             continue
 
         # ----- Mouse interactions -----
@@ -1549,7 +1651,7 @@ while running:
         title_text = "Crownfall"
 
         # Fonts
-        home_title_font = pygame.font.SysFont(None, 135)
+        home_title_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 135)
 
         # Base colors
         main_color = (180, 210, 255) # main bright light blue
@@ -1563,7 +1665,7 @@ while running:
 
         # Glow passes
         for expand in [2, 4, 6]:
-            glow_font = pygame.font.SysFont(None, 120 + expand)
+            glow_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 120 + expand)
             glow = glow_font.render(title_text, True, glow_color)
             glow.set_alpha(40)
             rect = glow.get_rect(center=(ROOM_WIDTH // 2, 120))
@@ -1611,12 +1713,12 @@ while running:
         pygame.draw.circle(screen, (200, 225, 255), (hx, hy), halo_radius, 2)
 
         # --- Menu Options ---
-        menu_font = pygame.font.SysFont(None, 55)
+        menu_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 55)
 
         option_color = (180, 210, 255)
         option_shadow = (70, 90, 130)
 
-        options = ["Play", "How to Play", "Quit"]
+        options = ["Play", "Controls", "Quit"]
         option_rects = []
         start_y = ROOM_HEIGHT // 2 - 80
 
@@ -1644,21 +1746,28 @@ while running:
             # Play
             if option_rects[0].collidepoint(pos):
                 on_home = False
-                player.x, player.y = 50, ROOM_HEIGHT - 100
+                loading_screen_active = True
 
             # How to Play
             elif option_rects[1].collidepoint(pos):
+                on_home = False
                 instructions_active = True
 
             # Quit
             elif option_rects[2].collidepoint(pos):
                 running = False
+        pygame.display.flip()
+        continue
 
-        if instructions_active:
-            draw_instructions(screen)
-            pygame.display.flip()
-            continue
+    
+    if instructions_active:
+        draw_instructions(screen)
+        pygame.display.flip()
+        continue
 
+    if loading_screen_active:
+        screen.fill((0,0,0))
+        draw_loading_screen(screen)
         pygame.display.flip()
         continue
 
