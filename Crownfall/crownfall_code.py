@@ -32,7 +32,6 @@ speed_multiplier = 2
 
 # Strength setup
 damage_multiplier = 1
-strength_potion_duration = 0  # Seconds remaining on active strength potion
 strength_multiplier = 2
 
 # Health set up
@@ -67,9 +66,16 @@ trade_menu_active = False # Trade menu closed
 upgrade_menu_active = False # Uograde menu closed
 instructions_active = False # Instructions screen flag
 loading_screen_active = False # Loading screen flag
+combat_active = False # Combat flag
+player_turn_done = False # Player has acted this turn
+enemy_turn_pending = False # Enemy is waiting to take its turn
+player_defending = False # Player is defending
+special_attack_used = False # Special attack used this turn
+strength_active = False # Strength potion in combat
 trade_prompt_key = None # Tracks which villager is offering trade
 trade_pending_key = None # Marks villager to show trade prompt after dialogue
 active_villager_index = None # Which villager for multiple in a room
+current_enemy_index = None # Which enemy for multiple in a room
 
 # Armor and Weapons set up
 armor_level = 0  # Player's armor upgrade level (increases max health)
@@ -200,6 +206,24 @@ trade_items = [("Health Potions", 30), ("Speed Potions", 10), ("Strength Potions
 upgrade_costs_gold = [10, 20, 30, 40, 50]  # Gold cost per level
 upgrade_costs_tokens = [1, 2, 3, 4, 5]     # Token cost per level
 
+# Combat set up
+enemy_health = []
+enemy_max_health = []
+enemy_rects = []
+enemy_turn_delay = 0
+enemy_delay_frames = 120
+dead_enemies = set()
+enemy_spawn_points = []
+battle_tips = [
+    "Defend to reduce incoming damage!",
+    "Strength potions increase your attack!",
+    "Watch enemy HP—some enemies heal at low health.",
+    "Special Attack deals double damage but uses your turn.",
+    "You can Run if the fight looks bad!"
+]
+tip_index = 0
+tip_timer = 0
+
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
     """Draws an object on the game surface and adds its collider or collectible
@@ -278,16 +302,31 @@ def draw_objects(x, y, obj_type, surface):
         rect = load_img("Path", 100, 100)
         return rect
 
-    #Enemy Interactables
+    #Enemies
     elif obj_type == "illager":
         rect = load_img("Archie", 524, 800)
         colliders.append(rect)
         enemy_tiles.append(rect)
+        enemy_rects.append(rect)
+        enemy_health.append(150)
+        enemy_max_health.append(150)
         return rect 
     elif obj_type == "king":
         rect = load_img("kingtower2", 350, 500)
         colliders.append(rect)
         enemy_tiles.append(rect)
+        enemy_rects.append(rect)
+        enemy_health.append(200)
+        enemy_max_health.append(200)
+        return rect
+    elif obj_type == "enemy":
+        rect = load_img("Enemy", 100, 100)
+        colliders.append(rect)
+        enemy_tiles.append((rect))
+        enemy_rects.append((rect))
+        enemy_spawn_points.append((x, y))
+        enemy_health.append(100)
+        enemy_max_health.append(100)
         return rect
 
     # Interactables 
@@ -335,7 +374,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     """Draws the current room based on the level, row, and column.  2
     Adds interactive and environmental objects to their respective lists."""
 
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles, enemy_health, enemy_max_health, enemy_rects
 
     # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg").convert()
@@ -344,6 +383,10 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Object containers for this room
     colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles = [], [], [], [], [], [], [], [], []
+    if not combat_active:
+        enemy_rects.clear()
+        enemy_health.clear()
+        enemy_max_health.clear()
 
     def can_draw(anchor_x, anchor_y, sset):
         """checks if a collectable should be drawn on the screen"""
@@ -355,11 +398,13 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         for x in [130, 230, 330, 430, 530]:
             draw_objects(x, 625, "path", surface) # Path
         for x in [530, 630, 730]:
-            draw_objects(x, 525, "path", surface) # Path
-        draw_objects(400, 250, "house1", surface)  # House 1
-        draw_objects(245, 320, "tree1", surface)   # Tree 1
-        draw_objects(25, 50, "rock1", surface)     # Rock 1
-        draw_objects(175, 25, "rock2", surface)    # Rock 2
+            draw_objects(x, 525, "path", surface) # 
+        if can_draw(730, 200, dead_enemies):
+            draw_objects(730, 200, "enemy", surface) # Enemy
+        draw_objects(400, 250, "house1", surface) # House 1
+        draw_objects(245, 320, "tree1", surface) # Tree 1
+        draw_objects(25, 50, "rock1", surface) # Rock 1
+        draw_objects(175, 25, "rock2", surface) # Rock 2
         if can_draw(600, 150, c_Artifacts):
             draw_objects(600, 150, "artifact", surface)  # Artifact
         draw_objects(675, 380, "villager", surface) #Villager
@@ -778,10 +823,6 @@ def draw_hud(surface):
         effect_rect = effect_text.get_rect(center=(ROOM_WIDTH // 2, y_offset))
         surface.blit(effect_text, effect_rect)
         y_offset += 26
-    if strength_potion_duration > 0:
-        effect_text = font.render(f"{strength_multiplier}x damage ({int(strength_potion_duration)}s)", True, (255, 100, 100))
-        effect_rect = effect_text.get_rect(center=(ROOM_WIDTH // 2, y_offset))
-        surface.blit(effect_text, effect_rect)
 
 # DRAWING TRADE PROMOPT
 def draw_trade_prompt(surface):
@@ -1104,7 +1145,6 @@ def draw_instructions(surface):
         "Movement:  WASD  or  Arrow Keys",
         "Use Speed Potion:  1",
         "Use Health Potion: 2",
-        "Use Strength Potion: 3",
         "Toggle HUD:  E",
         "Toggle Map:  M",
         "Interact / Talk:  Right-Click",
@@ -1160,6 +1200,198 @@ def draw_loading_screen(surface):
     for i, line in enumerate(lore):
         txt = font.render(line, True, (255, 255, 255))
         surface.blit(txt, (x + 40, start_y + i * 32))
+
+# DRAWING COMBAT SCREEN
+def draw_combat_screen(surface):
+    draw_overlay(surface)
+    w, h = 700, 520
+    x = (ROOM_WIDTH - w) // 2
+    y = (ROOM_HEIGHT - h) // 2
+
+    panel = pygame.Surface((w, h), pygame.SRCALPHA)
+    panel.fill((0, 0, 0, 240))  # same dark bg
+    surface.blit(panel, (x, y))
+    pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 3)
+
+    # ----- HEALTH BARS -----
+
+    # Player health bar
+    p_bar_w = 220
+    p_bar_h = 20
+    px = x + w - p_bar_w - 40
+    py = y + 30
+    pygame.draw.rect(surface, (0,0,0), (px, py, p_bar_w, p_bar_h))
+    pygame.draw.rect(surface, (255,255,255), (px, py, p_bar_w, p_bar_h), 2)
+    pygame.draw.rect(surface, (255,0,0), (px, py, p_bar_w, p_bar_h))
+    p_pct = max(0, health / max_health)
+    pygame.draw.rect(surface, (0,255,0), (px, py, p_bar_w * p_pct, p_bar_h))
+    p_label = font.render("PLAYER", True, (255,255,255))
+    p_label_x = px + (p_bar_w // 2) - (p_label.get_width() // 2)
+    p_label_y = py - p_label.get_height() - 4
+    surface.blit(p_label, (p_label_x, p_label_y))
+    p_hp_text = font.render(f"{int(health)}/{max_health}", True, (255,255,255))
+    surface.blit(p_hp_text, (px + p_bar_w//2 - p_hp_text.get_width()//2, py + p_bar_h + 5))
+
+    # Enemy health bar
+    if current_enemy_index is not None:
+        e_bar_w = 220
+        e_bar_h = 20
+        ex = x + 40
+        ey = y + 30
+        pygame.draw.rect(surface, (0,0,0), (ex, ey, e_bar_w, e_bar_h))
+        pygame.draw.rect(surface, (255,255,255), (ex, ey, e_bar_w, e_bar_h), 2)
+        pygame.draw.rect(surface, (255,0,0), (ex, ey, e_bar_w, e_bar_h))
+        e_pct = max(0, enemy_health[current_enemy_index] / enemy_max_health[current_enemy_index])
+        pygame.draw.rect(surface, (0,255,0), (ex, ey, e_bar_w * e_pct, e_bar_h))
+    e_label = font.render("ENEMY", True, (255,255,255))
+    e_label_x = ex + (e_bar_w // 2) - (e_label.get_width() // 2)
+    e_label_y = ey - e_label.get_height() - 4
+    surface.blit(e_label, (e_label_x, e_label_y))
+    e_cur = enemy_health[current_enemy_index]
+    e_max = enemy_max_health[current_enemy_index]
+    e_hp_text = font.render(f"{int(e_cur)}/{e_max}", True, (255,255,255))
+    surface.blit(e_hp_text, (ex + e_bar_w//2 - e_hp_text.get_width()//2, ey + e_bar_h + 5))
+
+    # Six buttons
+    btn_names = ["Health Potion", "Strength Potion", "Special Attack", "Attack", "Defend", "Run"]
+    btn_rects = []
+
+    btn_w, btn_h = 180, 50
+    spacing = 10
+    start_x = x + (w - (btn_w * 3 + spacing * 2)) // 2
+    start_y = y + h - 150
+
+    idx = 0
+    for row in range(2):
+        for col in range(3):
+            bx = start_x + col * (btn_w + spacing)
+            by = start_y + row * (btn_h + spacing)
+            rect = pygame.Rect(bx, by, btn_w, btn_h)
+            pygame.draw.rect(surface, (12, 12, 18), rect)
+            pygame.draw.rect(surface, (255, 255, 255), rect, 2)
+
+            text = font.render(btn_names[idx], True, (255, 255, 255))
+            text_rect = text.get_rect(center=rect.center)
+            surface.blit(text, text_rect)
+
+            btn_rects.append((rect, btn_names[idx]))
+            idx += 1
+
+    # Turn counter
+    turn_text = "PLAYER TURN" if not enemy_turn_pending else "ENEMY TURN"
+    color = (0,255,0) if turn_text == "PLAYER TURN" else (255,100,100)
+    turn_surf = font.render(turn_text, True, color)
+    turn_rect = turn_surf.get_rect(center=(x + w//2, y + 25))
+    surface.blit(turn_surf, turn_rect)
+
+    # --- Cinematic Bars ---
+    bar_h = 40
+    # Top bar
+    pygame.draw.rect(surface, (0, 0, 0), (0, 0, ROOM_WIDTH, bar_h))
+    # Bottom bar
+    pygame.draw.rect(surface, (0, 0, 0), (0, ROOM_HEIGHT - bar_h, ROOM_WIDTH, bar_h))
+
+    # Title text in the top bar
+    title_text = font.render("C R O W N F A L L   B A T T L E", True, (255, 255, 255))
+    title_rect = title_text.get_rect(center=(ROOM_WIDTH // 2, bar_h // 2 + 200))
+    surface.blit(title_text, title_rect)
+
+    # --- Rotating Battle Tips Box ---
+    global tip_index, tip_timer
+
+    tip_box_w = w - 80
+    tip_box_h = 50
+    tip_box_x = x + 40
+    tip_box_y = y + h
+
+    # Box
+    pygame.draw.rect(surface, (20, 20, 20), (tip_box_x, tip_box_y, tip_box_w, tip_box_h))
+    pygame.draw.rect(surface, (255, 255, 255), (tip_box_x, tip_box_y, tip_box_w, tip_box_h), 2)
+    # Timer — change tip every 4 seconds
+    tip_timer += 1
+    if tip_timer >= 240:  # 60 FPS × 4 seconds
+        tip_index = (tip_index + 1) % len(battle_tips)
+        tip_timer = 0
+    # Draw tip text
+    tip_surf = font.render(battle_tips[tip_index], True, (200, 200, 200))
+    tip_rect = tip_surf.get_rect(center=(tip_box_x + tip_box_w // 2, tip_box_y + tip_box_h // 2))
+    surface.blit(tip_surf, tip_rect)
+
+    # On screen feedback
+    if feedback and feedback_timer > 0:
+        fb_surf = font.render(feedback, True, (255,255,255))
+        fb_rect = fb_surf.get_rect(center=(x + w//2, start_y - 40))
+        surface.blit(fb_surf, fb_rect)
+    return btn_rects
+
+# ENEMY TURN AI
+def run_enemy_turn():
+    global health, enemy_turn_pending, player_defending, enemy_heals_used, feedback, feedback_timer
+
+    enemy_hp = enemy_health[current_enemy_index]
+    enemy_max = enemy_max_health[current_enemy_index]
+
+    # Enemy decision
+    low_hp = enemy_hp < enemy_max * 0.35
+    weights = []
+
+    if enemy_heals_used < 2:
+        heal_weight = 50 if low_hp else 10
+        weights.append(("heal", heal_weight))
+
+    defend_weight = 40 if low_hp else 20
+    weights.append(("defend", defend_weight))
+
+    attack_weight = 40
+    weights.append(("attack", attack_weight))
+
+    total = sum(w for _, w in weights)
+    r = random.randint(1, total)
+    cur = 0
+    for action, w in weights:
+        cur += w
+        if r <= cur:
+            enemy_choice = action
+            break
+
+    # Execute enemy action
+    if enemy_choice == "attack":
+        dmg = random.randint(8, 15)  # this is your base damage
+
+        if player_defending:
+            roll = random.random()  # 0.0 → 1.0
+            if roll < 0.25:
+                # 25% full hit
+                final_dmg = dmg
+                feedback, feedback_timer = f"Enemy hits you for {final_dmg} damage!", 2.0
+            elif roll < 0.75:
+                # 50% half damage
+                final_dmg = dmg // 2
+                feedback, feedback_timer = f"Enemy partially hits you for {final_dmg} damage!", 2.0
+            else:
+                # 25% miss
+                final_dmg = 0
+                feedback, feedback_timer = "Enemy attack MISSES!", 2.0
+        else:
+            # normal attack
+            final_dmg = dmg
+            feedback, feedback_timer = f"Enemy hits you for {final_dmg} damage!", 2.0
+
+        health -= final_dmg
+        player_defending = False
+
+    elif enemy_choice == "defend":
+        enemy_defending = True
+        feedback, feedback_timer = "Enemy defends!", 2.0
+
+    elif enemy_choice == "heal":
+        heal_amount = 25
+        enemy_health[current_enemy_index] = min(enemy_max, enemy_hp + heal_amount)
+        enemy_heals_used += 1
+        feedback, feedback_timer = f"Enemy heals for {heal_amount} HP!", 2.0
+
+    # Reset turn to people
+    enemy_turn_pending = False
 
 # DRAWING MINIMAP
 def draw_minimap(surface, level, row, col):
@@ -1474,12 +1706,20 @@ while running:
                         map_visible = False
                         upgrade_selection = 0
                         break
+
+                for e_rect in enemy_tiles:
+                    # Check if player is close enough to enemy
+                    if e_rect and player.colliderect(e_rect.inflate(50, 50)):
+                        combat_active = True
+                        current_enemy_index = i
+                        special_attack_used = False
+                        break
                 continue
 
             # Handle left click for upgrade button when upgrade menu is active
             if event.button == 1:
                 if trade_menu_active:
-                    # Recompute the trade menu button rect exactly as in draw_trade_menu
+                    # Remake the trade menu button rect exactly as in draw_trade_menu
                     box_w, box_h = 700, 520
                     box_x = (ROOM_WIDTH - box_w) // 2
                     box_y = (ROOM_HEIGHT - box_h) // 2
@@ -1530,9 +1770,103 @@ while running:
                         else:
                             feedback, feedback_timer = f"No {Item_key} to sell!", 2.5
                         continue
+                
+                # ---------- PLAYER CLICK IN COMBAT ----------
+                if combat_active and not enemy_turn_pending:
+
+                    for rect, name in combat_buttons:
+                        if rect.collidepoint(event.pos):
+                            # Track heals used
+                            global enemy_heals_used
+                            if "enemy_heals_used" not in globals():
+                                enemy_heals_used = 0
+                            damage = 0
+
+                            # ---------- PLAYER ACTIONS ----------
+                            if name == "Attack":
+                                weapon_scale = 1.0 + 0.2 * weapon_level
+                                if strength_active:
+                                    damage_multiplier = strength_multiplier * weapon_scale
+                                else:
+                                    damage_multiplier = weapon_base_multiplier * weapon_scale
+                                damage = int(10 * damage_multiplier)
+                                enemy_health[current_enemy_index] -= damage
+                                feedback, feedback_timer = f"You attacked for {damage} damage!", 2.0
+                                enemy_turn_pending = True
+                                enemy_turn_delay = enemy_delay_frames
+                                if enemy_health[current_enemy_index] <= 0:
+                                    combat_active = False
+                                    strength_active = False
+                                    # Get room & enemy location
+                                    rect = enemy_rects[current_enemy_index]
+                                    ax, ay = enemy_spawn_points[current_enemy_index]
+                                    dead_enemies.add((*current_room, ax, ay))
+
+                            elif name == "Special Attack":
+                                if special_attack_used:
+                                    feedback, feedback_timer = "You already used Special Attack!", 2.0
+                                    continue
+                                weapon_scale = 1.0 + 0.2 * weapon_level
+                                if strength_active:
+                                    damage_multiplier = strength_multiplier * weapon_scale
+                                else:
+                                    damage_multiplier = weapon_base_multiplier * weapon_scale
+                                damage = int(20 * damage_multiplier)
+                                enemy_health[current_enemy_index] -= damage
+                                special_attack_used = True
+                                feedback, feedback_timer = f"You used SPECIAL ATTACK for {damage} damage!", 2.0
+                                enemy_turn_pending = True
+                                enemy_turn_delay = enemy_delay_frames
+                                if enemy_health[current_enemy_index] <= 0:
+                                    combat_active = False
+                                    strength_active = False
+                                    # Get room & enemy location
+                                    rect = enemy_rects[current_enemy_index]
+                                    ax, ay = enemy_spawn_points[current_enemy_index]
+                                    dead_enemies.add((*current_room, ax, ay))
+
+                            elif name == "Defend":
+                                player_defending = True
+                                feedback, feedback_timer = "You brace yourself!", 2.0
+                                enemy_turn_pending = True
+                                enemy_turn_delay = enemy_delay_frames
+
+                            elif name == "Strength Potion":
+                                if inventory["Strength Potions"] > 0:
+                                    inventory["Strength Potions"] -= 1
+                                    strength_active = True
+                                    feedback, feedback_timer = "You used a Strength Potion!", 2.0
+                                    enemy_turn_pending = True
+                                    enemy_turn_delay = enemy_delay_frames
+                                else:
+                                    feedback, feedback_timer = "No Strength Potions!", 2.0
+                                    continue
+
+                            elif name == "Health Potion":
+                                if inventory["Health Potions"] > 0:
+                                    heal_amount = 25
+                                    health = min(max_health, health + heal_amount)
+                                    inventory["Health Potions"] -= 1
+                                    feedback, feedback_timer = f"You healed for {heal_amount} HP!", 2.0
+                                    enemy_turn_pending = True
+                                    enemy_turn_delay = enemy_delay_frames
+                                else:
+                                    feedback, feedback_timer = "No Health Potions!", 2.0
+                                    continue
+
+                            elif name == "Run":
+                                combat_active = False
+                                strength_active = False
+                                continue
+
+                            # ----- BEGIN ENEMY TURN DELAY -----
+                            player_turn_done = True
+                            enemy_turn_pending = True
+                            enemy_turn_delay = enemy_delay_frames
+                            break
 
                 if upgrade_menu_active:
-                    # Recompute the upgrade menu button rect exactly as in draw_upgrade_menu
+                    # Remake the upgrade menu button rect exactly as in draw_upgrade_menu
                     box_w, box_h = 700, 520
                     box_x = (ROOM_WIDTH - box_w) // 2
                     box_y = (ROOM_HEIGHT - box_h) // 2
@@ -1632,15 +1966,6 @@ while running:
                         message, message_color, message_timer = "Your health is already full!", (0, 255, 0), 0.75
                     else:
                         message, message_color, message_timer = "You have no health potions!", (255, 0, 0), 0.75
-
-                elif event.key == pygame.K_3:  # Strength Potion
-                    if inventory.get("Strength Potions", 0) > 0:
-                        inventory["Strength Potions"] -= 1
-                        # Add the fixed constant duration
-                        strength_potion_duration += 120
-                        message, message_color, message_timer = f"Strength potion used! Duration: {int(strength_potion_duration)}s", (255, 0, 0), 0.75
-                    else:
-                        message, message_color, message_timer = "No Strength Potions left!", (255, 0, 0), 0.75
 
             # --- Upgrade Hut Interaction ---
             if upgrade_menu_active:
@@ -1772,7 +2097,7 @@ while running:
         pygame.display.flip()
         continue
 
-    
+
     if instructions_active:
         draw_instructions(screen)
         pygame.display.flip()
@@ -1784,12 +2109,25 @@ while running:
         pygame.display.flip()
         continue
 
+    if combat_active:
+        # Enemy delayed turn logic STILL runs:
+        if enemy_turn_pending:
+            if enemy_turn_delay > 0:
+                enemy_turn_delay -= 1
+            else:
+                run_enemy_turn()   # <-- I'll give you this block below
+
+        combat_buttons = draw_combat_screen(screen)
+        pygame.display.flip()
+        continue  # <-- THIS MUST BE HERE to stop overworld from drawing
+
+
     # ---------- GAMEPLAY ----------
     mv_x = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
     mv_y = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
 
     # Prevent movement input from affecting player when trade menu or upgrade menu is active
-    if trade_menu_active or upgrade_menu_active or hud_visible:
+    if trade_menu_active or upgrade_menu_active or hud_visible or combat_active:
         mv_x = 0
         mv_y = 0
 
@@ -1851,6 +2189,7 @@ while running:
         pickup(strength_potions, "Strength Potions", "Strength Potions", 1, (255, 70, 0), "+1 strength potion")
         pickup(artifacts, "Artifacts", "Artifacts", 1, (160, 32, 240), "+1 artifact")
 
+    
     # ----- Player Drawing -----
     player_colors = {"up": (255, 255, 0), "down": (0, 255, 0), "left": (255, 0, 0), "right": (0, 0, 255)}
     pygame.draw.rect(screen, player_colors.get(facing, (255, 255, 255)), player)
@@ -1886,16 +2225,15 @@ while running:
                 trading_prompt_active = False
                 trade_prompt_key = None
 
+    weapon_scale = 1.0 + 0.2 * weapon_level
+    # Strength potion stays active entire fight using your flag
+    if strength_active:  
+        damage_multiplier = strength_multiplier * weapon_scale
+    else:
+        damage_multiplier = weapon_base_multiplier * weapon_scale
+
     # ----- Timers -----
     # Potion effect timer update
-    if strength_potion_duration > 0:
-        # Combine weapon multiplier and strength potion when damage is used elsewhere
-        damage_multiplier = strength_multiplier * (1.0 + 0.2 * weapon_level)
-        strength_potion_duration = max(0, strength_potion_duration - dt / 1000.0)
-    else:
-        # Not using strength potion
-        damage_multiplier = (1.0 + 0.2 * weapon_level) * weapon_base_multiplier
-
     if speed_potion_duration > 0:
         speed_potion_duration = max(0, speed_potion_duration - dt / 1000.0)
 
