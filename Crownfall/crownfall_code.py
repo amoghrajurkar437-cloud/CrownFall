@@ -328,6 +328,11 @@ def draw_objects(x, y, obj_type, surface):
         enemy_health.append(100)
         enemy_max_health.append(100)
         return rect
+    elif obj_type == "chief":
+        rect = load_img("Master_chief", 244, 504)
+        colliders.append(rect)
+        enemy_tiles.append(rect)
+        return rect
 
     # Interactables 
     elif obj_type == "villager":
@@ -676,6 +681,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 2 and row == 2 and col == 2:
         if can_draw(600, 250, c_Gold):
             draw_objects(600, 250, "gold", surface) # Gold
+        draw_objects(300, 50, "chief", surface) #For a Brick, he flew pretty good
 
 # DRAWING HUD
 def draw_hud(surface):
@@ -2249,4 +2255,5 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
+
 pygame.quit()
