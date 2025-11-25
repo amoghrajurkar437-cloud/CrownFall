@@ -76,6 +76,7 @@ trade_prompt_key = None # Tracks which villager is offering trade
 trade_pending_key = None # Marks villager to show trade prompt after dialogue
 active_villager_index = None # Which villager for multiple in a room
 current_enemy_index = None # Which enemy for multiple in a room
+previous_room = None # Tracks last room for enemy respawn logic
 
 # Armor and Weapons set up
 armor_level = 0  # Player's armor upgrade level (increases max health)
@@ -203,8 +204,8 @@ trade_selection = 0
 trade_items = [("Health Potions", 30), ("Speed Potions", 10), ("Strength Potions", 20), ("Upgrade Tokens", 20)]
 
 # Upgrade cost level tables
-upgrade_costs_gold = [10, 20, 30, 40, 50]  # Gold cost per level
-upgrade_costs_tokens = [1, 2, 3, 4, 5]     # Token cost per level
+upgrade_costs_gold = [10, 20, 30, 40, 50] # Gold cost per level
+upgrade_costs_tokens = [1, 2, 3, 4, 5] # Token cost per level
 
 # Combat set up
 enemy_health = []
@@ -218,7 +219,8 @@ battle_tips = [
     "Defend to reduce incoming damage!",
     "Strength potions increase your attack!",
     "Watch enemy HP—some enemies heal at low health.",
-    "Special Attack deals double damage but uses your turn.",
+    "Special Attack deals double damage",
+    "Special Attack can be used only once per battle.",
     "You can Run if the fight looks bad!"
 ]
 tip_index = 0
@@ -308,6 +310,7 @@ def draw_objects(x, y, obj_type, surface):
         colliders.append(rect)
         enemy_tiles.append(rect)
         enemy_rects.append(rect)
+        enemy_spawn_points.append((x, y))
         enemy_health.append(150)
         enemy_max_health.append(150)
         return rect 
@@ -316,8 +319,18 @@ def draw_objects(x, y, obj_type, surface):
         colliders.append(rect)
         enemy_tiles.append(rect)
         enemy_rects.append(rect)
+        enemy_spawn_points.append((x, y))
         enemy_health.append(200)
         enemy_max_health.append(200)
+        return rect
+    elif obj_type == "chief":
+        rect = load_img("Master_chief", 244, 504)
+        colliders.append(rect)
+        enemy_tiles.append(rect)
+        enemy_rects.append(rect)
+        enemy_spawn_points.append((x, y))
+        enemy_health.append(250)
+        enemy_max_health.append(250)
         return rect
     elif obj_type == "enemy":
         rect = load_img("Enemy", 100, 100)
@@ -327,11 +340,6 @@ def draw_objects(x, y, obj_type, surface):
         enemy_spawn_points.append((x, y))
         enemy_health.append(100)
         enemy_max_health.append(100)
-        return rect
-    elif obj_type == "chief":
-        rect = load_img("Master_chief", 244, 504)
-        colliders.append(rect)
-        enemy_tiles.append(rect)
         return rect
 
     # Interactables 
@@ -379,7 +387,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     """Draws the current room based on the level, row, and column.  2
     Adds interactive and environmental objects to their respective lists."""
 
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles, enemy_health, enemy_max_health, enemy_rects
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles, enemy_health, enemy_max_health, enemy_rects, previous_room
 
     # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg").convert()
@@ -388,10 +396,17 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Object containers for this room
     colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles = [], [], [], [], [], [], [], [], []
-    if not combat_active:
+
+    current = (level, row, col)
+    # Only clear if we ENTERED a different room AND we're not already in combat
+    if not combat_active and current != previous_room:
         enemy_rects.clear()
         enemy_health.clear()
         enemy_max_health.clear()
+        enemy_spawn_points.clear()
+
+    # Update room tracking
+    previous_room = current
 
     def can_draw(anchor_x, anchor_y, sset):
         """checks if a collectable should be drawn on the screen"""
@@ -515,7 +530,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 0 and row == 2 and col == 2:
         if can_draw(200, 150, c_Gold):
             draw_objects(200, 150, "gold", surface)  # Gold
-        draw_objects(189, -200, "illager", surface) #Boss Illager
+        if can_draw(189, -200, dead_enemies):
+            draw_objects(189, -200, "illager", surface) #Boss Illager
 
     # ───────── LEVEL 2 (level == 1)
     # Level 2: Bottom Left
@@ -612,7 +628,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 1 and row == 2 and col == 2:
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
-        draw_objects(200, 50, "king", surface) #He he he Ha!
+        if can_draw(200, 50, dead_enemies):
+            draw_objects(200, 50, "king", surface) #He he he Ha!
 
     # ───────── LEVEL 3 (level == 2)
     # Level 3: Bottom Left
@@ -681,7 +698,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 2 and row == 2 and col == 2:
         if can_draw(600, 250, c_Gold):
             draw_objects(600, 250, "gold", surface) # Gold
-        draw_objects(300, 50, "chief", surface) #For a Brick, he flew pretty good
+        if can_draw(200, 150, dead_enemies):
+            draw_objects(200, 150, "chief", surface) # Master Chief
 
 # DRAWING HUD
 def draw_hud(surface):
@@ -1209,6 +1227,7 @@ def draw_loading_screen(surface):
 
 # DRAWING COMBAT SCREEN
 def draw_combat_screen(surface):
+    """Draws the combat screen overlay with health bars, buttons, and turn info."""
     draw_overlay(surface)
     w, h = 700, 520
     x = (ROOM_WIDTH - w) // 2
@@ -1332,6 +1351,7 @@ def draw_combat_screen(surface):
 
 # ENEMY TURN AI
 def run_enemy_turn():
+    """Runs the enemy's turn in combat, choosing an action based on current health and state."""
     global health, enemy_turn_pending, player_defending, enemy_heals_used, feedback, feedback_timer
 
     enemy_hp = enemy_health[current_enemy_index]
@@ -1582,6 +1602,7 @@ def room_transition():
 
 # Helper to draw dark overlay
 def draw_overlay(surface):
+    """Draws a semi-transparent dark overlay over the entire surface."""
     # Create a semi-transparent fullscreen overlay
     overlay = pygame.Surface((ROOM_WIDTH, ROOM_HEIGHT), pygame.SRCALPHA)
     # Pygame.SRCALPHA = RGBA instead of just RGB
@@ -1590,6 +1611,7 @@ def draw_overlay(surface):
 
 # Helper to draw home bg
 def draw_home_background(surface):
+    """Draws the home screen background with subtle texture and vignette effect."""
     base = pygame.Surface((ROOM_WIDTH, ROOM_HEIGHT))
     base.fill((0, 0, 0))
 
@@ -1902,6 +1924,10 @@ while running:
 
         # ----- Toggles & Keyboard -----
         elif event.type == pygame.KEYDOWN and not on_home:
+            # No controls when combat is on
+            if combat_active:
+                break
+
             # --- Villager Interaction ---
             # If trade prompt is active, handle Y/N keys here first
             if trading_prompt_active:
@@ -2255,5 +2281,4 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
-
 pygame.quit()
