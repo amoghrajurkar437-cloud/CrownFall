@@ -528,8 +528,12 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Top Right
     elif level == 0 and row == 2 and col == 2:
-        if can_draw(200, 150, c_Gold):
-            draw_objects(200, 150, "gold", surface)  # Gold
+        for x in [498, 499, 500, 501, 502, 503, 504, 505, 506]:
+            if can_draw(x, 150, c_Gold):   
+                draw_objects(x, 150, "gold", surface)   #Gold
+        for y in [150, 151, 152, 153, 154, 155, 156, 157, 158]:
+            if can_draw(500, y, c_Gold):    
+                draw_objects(500, y, "gold", surface)   #Gold
         if can_draw(189, -200, dead_enemies):
             draw_objects(189, -200, "illager", surface) #Boss Illager
 
@@ -2281,4 +2285,5 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
+
 pygame.quit()
