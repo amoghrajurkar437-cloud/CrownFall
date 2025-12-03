@@ -39,7 +39,7 @@ health = 100
 max_health = 100
 
 # Inventory set up
-inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0}
+inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 0}
 inventory_limits = {"Gold": 150, "Artifacts": 7, "Health Potions": 3, "Speed Potions": 3, "Strength Potions": 3, "Upgrade Tokens": 15}
 
 # Collected sets
@@ -48,6 +48,10 @@ c_Gold = set()
 c_Health_Potions = set()
 c_Speed_Potions = set()
 c_Strength_Potions = set()
+
+# Minimap
+visited_rooms = set()
+minimap_memory = {} # Keeps icons permanently once discovered
 
 # On-screen notifications
 message = ""
@@ -80,7 +84,7 @@ previous_room = None # Tracks last room for enemy respawn logic
 
 # Armor and Weapons set up
 armor_level = 0  # Player's armor upgrade level (increases max health)
-weapon_level = 0  # Player's weapon upgrade level (increases damage)
+weapon_level = 5  # Player's weapon upgrade level (increases damage)
 inventory_level = 0  # Player's inventory-size upgrade level (increases limits)
 gold_pickup_level = 0  # Gold-per-pickup upgrade level
 # Base multipliers derived from upgrades
@@ -225,6 +229,9 @@ battle_tips = [
 ]
 tip_index = 0
 tip_timer = 0
+# Track which bosses have been defeated
+# The [False] * LEVELS creates a list with one False per level
+boss_defeated = [False] * LEVELS
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -236,7 +243,7 @@ def draw_objects(x, y, obj_type, surface):
         """Loads, scales, trims transparent padding, draws the image and returns the rect."""
         img = pygame.image.load(f"crownfall_images/{name}.png").convert_alpha()
 
-        # Scale up or down (if needed)
+        # Scale up or down
         w2, h2 = scale(name, w, h)
         w2, h2 = int(w2), int(h2)
         img = pygame.transform.scale(img, (w2, h2))
@@ -379,15 +386,14 @@ def draw_objects(x, y, obj_type, surface):
         rect = load_img("Strength_Potion", 40, 40)
         strength_potions.append((rect, x, y))
         return rect
-
     return None  # Fallback
 
 # DRAWING ROOMS
 def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
-    """Draws the current room based on the level, row, and column.  2
+    """Draws the current room based on the level, row, and column.
     Adds interactive and environmental objects to their respective lists."""
 
-    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles, enemy_health, enemy_max_health, enemy_rects, previous_room
+    global colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, upgrade_hut_tiles, enemy_tiles, enemy_health, enemy_max_health, enemy_rects, previous_room
 
     # Draw background
     bg = pygame.image.load("crownfall_images/Level_bg_1.jpg").convert()
@@ -395,10 +401,10 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     surface.blit(bg, (0, 0))
 
     # Object containers for this room
-    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, enemy_tiles = [], [], [], [], [], [], [], [], []
+    colliders, artifacts, gold, health_potions, speed_potions, strength_potions, water_tiles, villager_tiles, upgrade_hut_tiles, enemy_tiles = [], [], [], [], [], [], [], [], [], []
 
     current = (level, row, col)
-    # Only clear if we ENTERED a different room AND we're not already in combat
+    # Only clear if we enetered a different room and we're not already in combat
     if not combat_active and current != previous_room:
         enemy_rects.clear()
         enemy_health.clear()
@@ -407,20 +413,20 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Update room tracking
     previous_room = current
+    visited_rooms.add((level, row, col))
 
     def can_draw(anchor_x, anchor_y, sset):
         """checks if a collectable should be drawn on the screen"""
+        # Return True or False based on whether the item has been collected
         return (level, row, col, anchor_x, anchor_y) not in sset
 
-    # ───────── LEVEL 1 (level == 0)
+    # ───────── LEVEL 1 ─────────
     # Level 1 Bottom Left
     if level == 0 and row == 0 and col == 0:
         for x in [130, 230, 330, 430, 530]:
             draw_objects(x, 625, "path", surface) # Path
         for x in [530, 630, 730]:
-            draw_objects(x, 525, "path", surface) # 
-        if can_draw(730, 200, dead_enemies):
-            draw_objects(730, 200, "enemy", surface) # Enemy
+            draw_objects(x, 525, "path", surface) # Path
         draw_objects(400, 250, "house1", surface) # House 1
         draw_objects(245, 320, "tree1", surface) # Tree 1
         draw_objects(25, 50, "rock1", surface) # Rock 1
@@ -480,6 +486,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(x, 525, "path", surface) # Path
         for y in [425,325,225,125,25,0]:
             draw_objects(100, y, "path", surface) # Path
+        if can_draw(200, 450, dead_enemies):
+            draw_objects(200, 450, "enemy", surface) # Enemy
         draw_objects(400, 700, "path", surface) # Path
         draw_objects(400, 600, "path", surface) # Path
         draw_objects(400, 250, "house1", surface)  # House 1
@@ -496,6 +504,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(x, 525, "path", surface) # Path
         for y in [425,325]:
             draw_objects(300, y, "path", surface) # Path
+        if can_draw(450, 200, dead_enemies):
+            draw_objects(450, 200, "enemy", surface) # Enemy
         draw_objects(100, 200, "rock2", surface)  # Rock 2
         if can_draw(500, 250, c_Speed_Potions):
             draw_objects(500, 250, "speed_potion", surface)  # Speed Potion
@@ -517,7 +527,11 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         for y in [700,600,500,400,300]:
             draw_objects(100, y, "path", surface) # Path
         for x in [200,300,400,500,0]:
-            draw_objects(x, 300, "path", surface) # Path (note includes 000 -> 0)
+            draw_objects(x, 300, "path", surface) # Path
+        if can_draw(600, 400, dead_enemies):
+            draw_objects(600, 400, "enemy", surface) # Enemy
+        if can_draw(150, 350, dead_enemies):
+            draw_objects(150, 350, "enemy", surface) # Enemy
         draw_objects(620, 170, "tree2", surface)  # Tree 2
         draw_objects(200, 25, "house1", surface)  # House 1
         if can_draw(100, 200, c_Health_Potions):
@@ -537,11 +551,13 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(189, -200, dead_enemies):
             draw_objects(189, -200, "illager", surface) #Boss Illager
 
-    # ───────── LEVEL 2 (level == 1)
+    # ───────── LEVEL 2 ─────────
     # Level 2: Bottom Left
     if level == 1 and row == 0 and col == 0:
         for x in [500,600,700]:
             draw_objects(x, 600, "path", surface) # Path
+        if can_draw(300, 300, dead_enemies):
+            draw_objects(300, 300, "enemy", surface) # Enemy
         draw_objects(620, 420, "tree2", surface)  # Tree 2
         if can_draw(100, 100, c_Gold):
             draw_objects(100, 100, "gold", surface)  # Gold
@@ -556,6 +572,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(500, y, "path", surface) # Path
         for x in [600,700]:
             draw_objects(x, 200, "path", surface) # Path
+        if can_draw(600, 500, dead_enemies):
+            draw_objects(600, 500, "enemy", surface) # Enemy
         draw_objects(400, 300, "rock2", surface)  # Rock 2
         draw_objects(200, 170, "tree1", surface)  # Tree 1
 
@@ -567,6 +585,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(x, 200, "wall1", surface) # Wall 1
         for y in [500,450,400,350]:
             draw_objects(-130, y, "wall2", surface) # Wall 2
+        if can_draw(500, 300, dead_enemies):
+            draw_objects(500, 300, "enemy", surface) # Enemy
         draw_objects(200, 400, "villager", surface) # Villager
         draw_objects(400, 350, "villager", surface) # Villager
         draw_objects(650, 400, "villager", surface) # Villager
@@ -595,6 +615,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(x, 300, "path", surface) # Path
         for x in [-100,0,200,600]:
             draw_objects(x, 0, "wall1", surface) # Wall 1
+        if can_draw(150, 250, dead_enemies):
+            draw_objects(150, 250, "enemy", surface) # Enemy
         if can_draw(400, 400, c_Health_Potions):
             draw_objects(400, 400, "health_potion", surface) # Health Potion
         if can_draw(700, 200, c_Gold):
@@ -612,6 +634,10 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 1 and row == 2 and col == 0:
         for y in [-200,0,200,400]:
             draw_objects(600, y, "wall2", surface) # Wall 2
+        if can_draw(200, 400, dead_enemies):
+            draw_objects(200, 400, "enemy", surface) # Enemy
+        if can_draw(100, 200, dead_enemies):
+            draw_objects(100, 200, "enemy", surface) # Enemy
         draw_objects(400, 300, "rock1", surface) # Rock 1
         draw_objects(220, 220, "tree2", surface) # Tree 2
         if can_draw(450, 100, c_Artifacts):
@@ -619,10 +645,14 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Top Middle
     elif level == 1 and row == 2 and col == 1:
+        if can_draw(600, 150, dead_enemies):
+            draw_objects(600, 150, "enemy", surface) # Enemy
         if can_draw(300, 250, c_Health_Potions):
             draw_objects(300, 250, "health_potion", surface) # Health Potion
         if can_draw(500, 350, c_Artifacts):
             draw_objects(500, 350, "artifact", surface) # Artifact
+        if can_draw(150, 150, dead_enemies):
+            draw_objects(150, 150, "enemy", surface) # Enemy
         if can_draw(700, 150, c_Gold):
             draw_objects(700, 150, "gold", surface) # Gold
         if can_draw(100, 450, c_Gold):
@@ -633,11 +663,13 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
         if can_draw(200, 50, dead_enemies):
-            draw_objects(200, 50, "king", surface) #He he he Ha!
+            draw_objects(200, 50, "king", surface) # Boss King Tower
 
-    # ───────── LEVEL 3 (level == 2)
+    # ───────── LEVEL 3 ─────────
     # Level 3: Bottom Left
     if level == 2 and row == 0 and col == 0:
+        if can_draw(300, 200, dead_enemies):
+            draw_objects(300, 200, "enemy", surface) # Enemy
         draw_objects(200, 300, "tree1", surface) # Tree 1
         draw_objects(400, 300, "water", surface) # Water
 
@@ -650,6 +682,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     # Level 3: Bottom Right
     elif level == 2 and row == 0 and col == 2:
         draw_objects(20, 170, "tree1", surface) # Tree 1
+        if can_draw(150, 400, dead_enemies):
+            draw_objects(150, 400, "enemy", surface) # Enemy
         if can_draw(700, 25, c_Gold):
             draw_objects(700, 25, "gold", surface) # Gold
         if can_draw(700, 500, c_Health_Potions):
@@ -662,6 +696,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 3: Middle Left
     elif level == 2 and row == 1 and col == 0:
+        if can_draw(350, 250, dead_enemies):
+            draw_objects(350, 250, "enemy", surface) # Enemy
         draw_objects(400, 300, "rock2", surface) # Rock 2
         draw_objects(170, 170, "tree2", surface) # Tree 3
         if can_draw(350, 200, c_Health_Potions):
@@ -670,12 +706,18 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     # Level 3: Middle
     elif level == 2 and row == 1 and col == 1:
         draw_objects(300, 100, "house2", surface) # House 2
+        if can_draw(200, 300, c_Health_Potions):
+            draw_objects(200, 300, "health_potion", surface) # Health Potion
+        if can_draw(600, 550, dead_enemies):
+            draw_objects(600, 550, "enemy", surface) # Enemy
         if can_draw(700, 25, c_Gold):
             draw_objects(700, 25, "gold", surface) # Gold
 
     # Level 3: Middle Right
     elif level == 2 and row == 1 and col == 2:
         draw_objects(220, 320, "tree2", surface) # Tree
+        if can_draw(400, 300, dead_enemies):
+            draw_objects(400, 300, "enemy", surface) # Enemy
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
         if can_draw(500, 200, c_Gold):
@@ -687,12 +729,18 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 3: Top Left
     elif level == 2 and row == 2 and col == 0:
+        if can_draw(500, 450, dead_enemies):
+            draw_objects(500, 450, "enemy", surface) # Enemy
         draw_objects(270, 120, "tree1", surface) # Tree 1
 
     # Level 3: Top Middle
     elif level == 2 and row == 2 and col == 1:
         draw_objects(20, 170, "tree1", surface) # Tree 1
         draw_objects(420, 270, "tree2", surface) # Tree 2
+        if can_draw(200, 250, dead_enemies):
+            draw_objects(200, 250, "enemy", surface) # Enemy
+        if can_draw(100, 25, dead_enemies):
+            draw_objects(100, 25, "enemy", surface) # Enemy
         if can_draw(500, 25, c_Gold):
             draw_objects(500, 25, "gold", surface) # Gold
         if can_draw(400, 600, c_Gold):
@@ -703,7 +751,16 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(600, 250, c_Gold):
             draw_objects(600, 250, "gold", surface) # Gold
         if can_draw(200, 150, dead_enemies):
-            draw_objects(200, 150, "chief", surface) # Master Chief
+            draw_objects(200, 150, "chief", surface) # Boss Master Chief
+
+    # Save minimap data for the 
+    # Tuple = (level, row, col)
+    room_id = tuple(current_room)
+    minimap_memory[room_id] = {
+        "villagers": [(v.x, v.y) for v in villager_tiles],
+        "enemies": [(e.x, e.y) for e in enemy_tiles],
+        "huts": [(h.x, h.y) for h in upgrade_hut_tiles]
+    }
 
 # DRAWING HUD
 def draw_hud(surface):
@@ -712,11 +769,14 @@ def draw_hud(surface):
         return  # Don't draw anything if HUD is hidden
 
     global map_visible, trading_prompt_active
+
+    # Close map or trading prompt if HUD is opened
     if map_visible:
-        map_visible = not map_visible # Turn off map when HUD is visible
+        map_visible = not map_visible
     elif trading_prompt_active:
         trading_prompt_active = not trading_prompt_active
 
+    level, row, col = current_room  # Unpack current room
     draw_overlay(surface)
 
     # --- Health bar ---
@@ -768,11 +828,12 @@ def draw_hud(surface):
         surface.blit(txt, (left_pad, y))
         y += inv_h_line
 
-    # --- Upgrades (armor/weapon) ---
+    # --- Upgrades and gold-per-pickup ---
     aw_box_w = 520
-    aw_box_h = 84
-    aw_box_x = inv_x
+    aw_box_h = 80
+    aw_box_x = (ROOM_WIDTH - aw_box_w) // 2
     aw_box_y = inventory_rect.bottom + 8
+
     pygame.draw.rect(surface, (0, 0, 0), (aw_box_x, aw_box_y, aw_box_w, aw_box_h))
     pygame.draw.rect(surface, (255, 255, 255), (aw_box_x, aw_box_y, aw_box_w, aw_box_h), 2)
 
@@ -785,7 +846,7 @@ def draw_hud(surface):
     surface.blit(armor_txt, (aw_box_x + 12, aw_box_y + 44))
     surface.blit(weapon_txt, (aw_box_x + 240, aw_box_y + 44))
 
-    # --- Gold per pickup box inventory ---
+    # --- Gold per pickup box ---
     pickup_box_w = 300
     pickup_box_h = 60
     pickup_box_x = (ROOM_WIDTH - pickup_box_w) // 2
@@ -803,34 +864,57 @@ def draw_hud(surface):
     surface.blit(pickup_lvl_txt, pickup_lvl_rect)
 
     # --- MINI-MAP ---
-    # Draw a small minimap of the current room
-    map_size = 90
+    map_size = 180
     cell_size = map_size // GRID_WIDTH
-    map_x = (ROOM_WIDTH - map_size) // 2
+    map_x = ROOM_WIDTH // 2 - map_size // 2
     map_y = pickup_box_y + pickup_box_h + 20
 
-    pygame.draw.rect(surface, (0, 0, 0), (map_x - 5, map_y - 5, map_size + 10, map_size + 10))
+    # background box
+    pygame.draw.rect(surface, (100, 100, 100), (map_x - 5, map_y - 5, map_size + 10, map_size + 10))
     pygame.draw.rect(surface, (255, 255, 255), (map_x - 5, map_y - 5, map_size + 10, map_size + 10), 2)
 
-    level, row, col = current_room
+    # draw all rooms (visited light, unvisited dark)
     for r in range(GRID_HEIGHT):
         for c in range(GRID_WIDTH):
             x = map_x + c * cell_size
             y = map_y + (GRID_HEIGHT - 1 - r) * cell_size
             rect = pygame.Rect(x, y, cell_size - 2, cell_size - 2)
-            if r == row and c == col:
-                pygame.draw.rect(surface, (255, 255, 255), rect)
+
+            room_id = (level, r, c)
+
+            if room_id not in visited_rooms:
+                pygame.draw.rect(surface, (0, 0, 0), rect)
             else:
-                pygame.draw.rect(surface, (100, 100, 100), rect, 1)
+                pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
-    # Draw the level text info 
-    level_text = f"Level {level + 1} - {['Bottom', 'Middle', 'Top'][row]} {['Left', 'Middle', 'Right'][col]}"
-    info_surf = font.render(level_text, True, (255, 255, 255))
-    info_rect = info_surf.get_rect(center=(ROOM_WIDTH // 2, map_y + map_size + 16))
+    # draw icons for every visited room (villagers, enemies, huts)
+    for r in range(GRID_HEIGHT):
+        for c in range(GRID_WIDTH):
+            room_id = (level, r, c)
+            if room_id in visited_rooms:
+                draw_minimap_icons(surface, map_x, map_y, map_size, ROOM_WIDTH, ROOM_HEIGHT, room_id)
 
-    pygame.draw.rect(surface, (0, 0, 0), (info_rect.left - 8, info_rect.top - 4, info_rect.width + 16, info_rect.height + 8))
-    pygame.draw.rect(surface, (255, 255, 255), (info_rect.left - 8, info_rect.top - 4, info_rect.width + 16, info_rect.height + 8), 2)
-    surface.blit(info_surf, info_rect)
+    # draw player icon
+    _, room_r, room_c = tuple(current_room)
+    cell_w = map_size // GRID_WIDTH
+    cell_h = map_size // GRID_HEIGHT
+    room_origin_x = map_x + room_c * cell_w
+    room_origin_y = map_y + (GRID_HEIGHT - 1 - room_r) * cell_h
+    sx = cell_w / ROOM_WIDTH
+    sy = cell_h / ROOM_HEIGHT
+    px = room_origin_x + player.x * sx
+    py = room_origin_y + player.y * sy
+    pygame.draw.rect(surface, (0, 255, 0), (px, py, 5, 5))
+
+    # Level location label
+    # Picking from lists to convert row/col to text
+    text = f"Level {level + 1} - {['Bottom','Middle','Top'][row]} {['Left','Middle','Right'][col]}"
+    info = font.render(text, True, (255, 255, 255))
+    info_rect = info.get_rect(center=(ROOM_WIDTH // 2, map_y + 200))
+
+    pygame.draw.rect(surface, (0, 0, 0), (info_rect.left - 10, info_rect.top - 5, info_rect.width + 20, info_rect.height + 10))
+    pygame.draw.rect(surface, (255, 255, 255), (info_rect.left - 10, info_rect.top - 5, info_rect.width + 20, info_rect.height + 10), 2)
+    surface.blit(info, info_rect)
 
     # --- Potion Effects Box ---
     effect_box_w = 520
@@ -845,12 +929,15 @@ def draw_hud(surface):
     effect_title_rect = effect_title.get_rect(center=(ROOM_WIDTH // 2, effect_box_y + 20))
     surface.blit(effect_title, effect_title_rect)
 
-    y_offset = effect_box_y + 44
+    y = effect_box_y + 46
     if speed_potion_duration > 0:
-        effect_text = font.render(f"{speed_multiplier}x speed ({int(speed_potion_duration)}s)", True, (0, 255, 255))
-        effect_rect = effect_text.get_rect(center=(ROOM_WIDTH // 2, y_offset))
-        surface.blit(effect_text, effect_rect)
-        y_offset += 26
+        spd = font.render(f"Speed x{speed_multiplier} ({int(speed_potion_duration)}s)", True, (255, 255, 255))
+        surface.blit(spd, (effect_box_x + 16, y))
+        y += 28
+    if strength_active:
+        strn = font.render("Strength x2", True, (255, 255, 255))
+        surface.blit(strn, (effect_box_x + 16, y))
+        y += 28
 
 # DRAWING TRADE PROMOPT
 def draw_trade_prompt(surface):
@@ -974,19 +1061,19 @@ def draw_trade_menu(surface):
 # DRAW UPGRADE SCREEN
 def draw_upgrade_menu(surface):
     """Draw upgrade menu full-screen semi-transparent overlay with SHOP/INVENTORY/help and in-menu feedback"""
+    # Draw nothing if upgrade menu is not active
     if not upgrade_menu_active:
-        return # Don't draw anything if not tradeing
-    
+        return
+
     global gold_per_pickup
 
     draw_overlay(surface)
-
     # Content box area (centered panel)
     box_w, box_h = 700, 520
     box_x = (ROOM_WIDTH - box_w) // 2
     box_y = (ROOM_HEIGHT - box_h) // 2
 
-    # Draw an inner panel to place text on (solid-ish)
+    # Draw an inner panel to place text on
     inner = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
     inner.fill((20, 20, 30, 230))
     surface.blit(inner, (box_x, box_y))
@@ -1021,6 +1108,7 @@ def draw_upgrade_menu(surface):
 
     def get_costs_for_level(level):
         """Return (gold_cost, token_cost) for next level index 'level' (current level)."""
+        # Don't go past max level
         if level >= MAX_UPGRADE_LEVEL:
             return None, None
         return upgrade_costs_gold[level], upgrade_costs_tokens[level]
@@ -1081,7 +1169,7 @@ def draw_upgrade_menu(surface):
     btn_tr = btn_txt.get_rect(center=btn_rect.center)
     surface.blit(btn_txt, btn_tr)
 
-        # Draw upgrade feedback message inside the upgrade menu
+    # Draw upgrade feedback message inside the upgrade menu
     if feedback and feedback_timer > 0:
         msg_surf = font.render(feedback, True, (255, 255, 255))
         msg_rect = msg_surf.get_rect(center=(ROOM_WIDTH // 2, cost_box.bottom + 30))
@@ -1197,8 +1285,10 @@ def draw_instructions(surface):
 # DRAWING LOADING SCREEN
 def draw_loading_screen(surface):
     """Loading screen with lore + waits for SPACE to continue."""
+
     draw_overlay(surface)
 
+    # panel
     w, h = 720, 520
     x = (ROOM_WIDTH - w) // 2
     y = (ROOM_HEIGHT - h) // 2
@@ -1233,12 +1323,14 @@ def draw_loading_screen(surface):
 def draw_combat_screen(surface):
     """Draws the combat screen overlay with health bars, buttons, and turn info."""
     draw_overlay(surface)
+
+    # Centered panel
     w, h = 700, 520
     x = (ROOM_WIDTH - w) // 2
     y = (ROOM_HEIGHT - h) // 2
 
     panel = pygame.Surface((w, h), pygame.SRCALPHA)
-    panel.fill((0, 0, 0, 240))  # same dark bg
+    panel.fill((0, 0, 0, 240))
     surface.blit(panel, (x, y))
     pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 3)
 
@@ -1321,8 +1413,8 @@ def draw_combat_screen(surface):
     pygame.draw.rect(surface, (0, 0, 0), (0, ROOM_HEIGHT - bar_h, ROOM_WIDTH, bar_h))
 
     # Title text in the top bar
-    title_text = font.render("C R O W N F A L L   B A T T L E", True, (255, 255, 255))
-    title_rect = title_text.get_rect(center=(ROOM_WIDTH // 2, bar_h // 2 + 200))
+    title_text = title_font.render("CROWNFALL", True, (255, 255, 255))
+    title_rect = title_text.get_rect(center=(ROOM_WIDTH // 2, bar_h // 2 + 50))
     surface.blit(title_text, title_rect)
 
     # --- Rotating Battle Tips Box ---
@@ -1365,7 +1457,8 @@ def run_enemy_turn():
     low_hp = enemy_hp < enemy_max * 0.35
     weights = []
 
-    if enemy_heals_used < 2:
+    # Heal option if under 5 heals used and not at full health
+    if enemy_heals_used < 5 and enemy_hp < enemy_max:
         heal_weight = 50 if low_hp else 10
         weights.append(("heal", heal_weight))
 
@@ -1415,7 +1508,7 @@ def run_enemy_turn():
         feedback, feedback_timer = "Enemy defends!", 2.0
 
     elif enemy_choice == "heal":
-        heal_amount = 25
+        heal_amount = 20
         enemy_health[current_enemy_index] = min(enemy_max, enemy_hp + heal_amount)
         enemy_heals_used += 1
         feedback, feedback_timer = f"Enemy heals for {heal_amount} HP!", 2.0
@@ -1425,40 +1518,87 @@ def run_enemy_turn():
 
 # DRAWING MINIMAP
 def draw_minimap(surface, level, row, col):
-    """Draws a simple minimap for the current level under the level text."""
+    """Draw the whole minimap and icons for all visited rooms (not just the current room)."""
     if not map_visible:
-        return  # Don't draw anything if map is hidden
+        return
 
-    map_size = 90  # total width/height of the map
+    map_size = 200
     cell_size = map_size // GRID_WIDTH
-
     map_x = ROOM_WIDTH - map_size - 20
-    map_y = 60  # positioned just below the level text
+    map_y = 60
 
-    # background box
-    pygame.draw.rect(surface, (0, 0, 0), (map_x - 5, map_y - 5, map_size + 10, map_size + 10))
+    # background
+    pygame.draw.rect(surface, (100, 100, 100), (map_x - 5, map_y - 5, map_size + 10, map_size + 10))
     pygame.draw.rect(surface, (255, 255, 255), (map_x - 5, map_y - 5, map_size + 10, map_size + 10), 2)
 
+    # draw grid cells (dark for not visited)
     for r in range(GRID_HEIGHT):
         for c in range(GRID_WIDTH):
             x = map_x + c * cell_size
-            y = map_y + (GRID_HEIGHT - 1 - r) * cell_size  # flip vertically so top is top
-
+            y = map_y + (GRID_HEIGHT - 1 - r) * cell_size
             rect = pygame.Rect(x, y, cell_size - 2, cell_size - 2)
-
-            # highlight the current room
-            if r == row and c == col:
-                pygame.draw.rect(surface, (255, 255, 255), rect)  # player position
+            room_id = (level, r, c)
+            if room_id not in visited_rooms:
+                pygame.draw.rect(surface, (0, 0, 0), rect)
             else:
-                pygame.draw.rect(surface, (100, 100, 100), rect, 1)
+                pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
-    # Level location
+    # draw icons for all visited rooms using stored memory
+    for room_id in list(visited_rooms):
+        lvl, rr, cc = room_id
+        if lvl != level:
+            continue  # only show rooms for current level
+        draw_minimap_icons(surface, map_x, map_y, map_size, ROOM_WIDTH, ROOM_HEIGHT, room_id)
+
+    # draw player icon on the current room (so player marker is always accurate)
+    # compute current room origin and draw player
+    _, room_r, room_c = tuple(current_room)
+    cell_w = map_size // GRID_WIDTH
+    cell_h = map_size // GRID_HEIGHT
+    room_origin_x = map_x + room_c * cell_w
+    room_origin_y = map_y + (GRID_HEIGHT - 1 - room_r) * cell_h
+    sx = cell_w / ROOM_WIDTH
+    sy = cell_h / ROOM_HEIGHT
+    px = room_origin_x + player.x * sx
+    py = room_origin_y + player.y * sy
+    pygame.draw.rect(surface, (0, 255, 0), (px, py, 5, 5))
+
+    # Level location text (keep your existing rendering)
     text = f"Level {level + 1} - {['Bottom','Middle','Top'][row]} {['Left','Middle','Right'][col]}"
     info = font.render(text, True, (255, 255, 255))
     rect = info.get_rect(topright=(ROOM_WIDTH - 20, 20))
     pygame.draw.rect(surface, (0, 0, 0), (rect.left - 10, rect.top - 5, rect.width + 20, rect.height + 10))
     pygame.draw.rect(surface, (255, 255, 255), (rect.left - 10, rect.top - 5, rect.width + 20, rect.height + 10), 2)
     surface.blit(info, rect)
+
+# DRAW MINIMAP ICONS 
+def draw_minimap_icons(surface, map_x, map_y, map_size, room_w, room_h, room_id):
+    """Draw icons for a specific room_id using minimap_memory[room_id]."""
+    level, room_r, room_c = room_id
+
+    cell_w = map_size // GRID_WIDTH
+    cell_h = map_size // GRID_HEIGHT
+    room_origin_x = map_x + room_c * cell_w
+    room_origin_y = map_y + (GRID_HEIGHT - 1 - room_r) * cell_h
+
+    sx = cell_w / room_w
+    sy = cell_h / room_h
+
+    # pull stored data (empty lists if nothing saved)
+    data = minimap_memory.get(room_id, {})
+    villagers = data.get("villagers", [])
+    enemies = data.get("enemies", [])
+    huts = data.get("huts", [])
+
+    # draw villagers
+    for x, y in villagers:
+        pygame.draw.rect(surface, (0, 0, 255), (room_origin_x + x * sx, room_origin_y + y * sy, 5, 5))
+    # draw huts
+    for x, y in huts:
+        pygame.draw.rect(surface, (255, 255, 0), (room_origin_x + x * sx, room_origin_y + y * sy, 5, 5))
+    # draw enemies
+    for x, y in enemies:
+        pygame.draw.rect(surface, (255, 0, 0), (room_origin_x + x * sx, room_origin_y + y * sy, 5, 5))
 
 # DRAWING MESSAGE
 def draw_message(surface, text, timer, color):
@@ -1536,7 +1676,8 @@ def colllision_check(dx, dy, coll_list):
 
 # MOVEMENT
 def room_transition():
-    global current_room
+    global current_room, feedback, feedback_timer
+    """Handles player movement between rooms and levels based on position."""
     level, row, col = current_room
 
     # --- NORMAL ROOM TRANSITIONS ---
@@ -1561,6 +1702,7 @@ def room_transition():
             if col > 0:
                 current_room[2] -= 1
                 player.right = ROOM_WIDTH
+                visited_rooms.add(tuple(current_room))
             else:
                 player.left = 0
 
@@ -1569,6 +1711,7 @@ def room_transition():
             if col < GRID_WIDTH - 1:
                 current_room[2] += 1
                 player.left = 0
+                visited_rooms.add(tuple(current_room))
             else:
                 player.right = ROOM_WIDTH
 
@@ -1577,6 +1720,7 @@ def room_transition():
             if row < GRID_HEIGHT - 1:
                 current_room[1] += 1
                 player.bottom = ROOM_HEIGHT
+                visited_rooms.add(tuple(current_room))
             else:
                 player.top = 0
 
@@ -1585,6 +1729,7 @@ def room_transition():
             if row > 0:
                 current_room[1] -= 1
                 player.top = 0
+                visited_rooms.add(tuple(current_room))
             else:
                 player.bottom = ROOM_HEIGHT
 
@@ -1592,9 +1737,17 @@ def room_transition():
 
     # Next Level
     if at_level_up_corner:
+            # Prevent advancing to next level until boss in this level is defeated.
+        if not boss_defeated[level]:
+            feedback, feedback_timer = "You must defeat the boss before advancing to the next level!", 3.0
+            # Keep player inside the room boundary (prevent accidental transition)
+            player.top = 0
+            player.right = ROOM_WIDTH
+            return
         current_room = [level + 1, 0, 0]  # go to bottom-left of next level
         player.x = 50
         player.y = ROOM_HEIGHT - 100
+        visited_rooms.add(tuple(current_room))
         return
 
     # Previous Level
@@ -1602,6 +1755,7 @@ def room_transition():
         current_room = [level - 1, GRID_HEIGHT - 1, GRID_WIDTH - 1]  # go to top-right of previous level
         player.x = ROOM_WIDTH - player.width - 50
         player.y = 50
+        visited_rooms.add(tuple(current_room))
         return
 
 # Helper to draw dark overlay
@@ -1646,6 +1800,11 @@ def draw_home_background(surface):
     surface.blit(base, (0, 0))
     surface.blit(burn, (0, 0))
 
+# Helper to compute shards required for boss fight
+def shards_required_for_level(level_index):
+    """Returns the number of Enemy Shards required to unlock the boss fight for the given level index."""
+    return 30 + level_index * 60
+
 # MAIN LOOP
 running = True
 while running:
@@ -1654,6 +1813,46 @@ while running:
 
     # ---------- EVENT HANDLING ----------
     for event in pygame.event.get():
+
+        # --- INSTA-KILL BUTTON (K) ---
+        if combat_active and event.type == pygame.KEYDOWN and event.key == pygame.K_k:
+            # Instantly kill the enemy
+            enemy_health[current_enemy_index] = 0
+            combat_active = False
+            enemy_turn_pending = False
+            strength_active = False
+
+            # Determine room position
+            try:
+                lvl_idx = current_room[0]
+                r_idx = current_room[1]
+                c_idx = current_room[2]
+            except Exception:
+                lvl_idx, r_idx, c_idx = 0, 0, 0
+
+            # Determine enemy spawn point for removal tracking
+            rect = enemy_rects[current_enemy_index]
+            ax, ay = enemy_spawn_points[current_enemy_index]
+            dead_enemies.add((*current_room, ax, ay))
+
+            # Award shards OR boss completion
+            if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
+                # Boss room
+                boss_defeated[lvl_idx] = True
+            else:
+                # Normal enemy
+                inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
+
+            # Remove enemy from all lists
+            enemy_health.pop(current_enemy_index)
+            enemy_max_health.pop(current_enemy_index)
+            enemy_rects.pop(current_enemy_index)
+            enemy_tiles.pop(current_enemy_index)
+            enemy_spawn_points.pop(current_enemy_index)
+            continue
+
+
+
         if event.type == pygame.QUIT:
             running = False
             break
@@ -1685,8 +1884,8 @@ while running:
         # ----- Mouse interactions -----
         if event.type == pygame.MOUSEBUTTONDOWN and not on_home:
             # ---Villager interactions---
-            # If right-click and dialogue active -> advance dialogue 
             if event.button == 3:
+            # If right-click and dialogue active -> advance dialogue 
                 if trading_prompt_active or trade_menu_active:
                     continue
 
@@ -1739,17 +1938,37 @@ while running:
                         upgrade_selection = 0
                         break
 
-                for e_rect in enemy_tiles:
-                    # Check if player is close enough to enemy
+                # --- Enemy Interaction --- 
+                for idx, e_rect in enumerate(enemy_tiles):
                     if e_rect and player.colliderect(e_rect.inflate(50, 50)):
+                        # Block boss fight if not enough shards
+                        try:
+                            lvl_idx = current_room[0]
+                            r_idx = current_room[1]
+                            c_idx = current_room[2]
+                        except Exception:
+                            lvl_idx, r_idx, c_idx = 0, 0, 0
+
+                        if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
+                            required = shards_required_for_level(lvl_idx)
+                            if inventory.get("Enemy Shards", 0) < required:
+                                feedback, feedback_timer = "You need more Enemy Shards before you can confront the boss!", 2.5
+                                continue  # Blocks boss fight
+
+                        # Start combat
                         combat_active = True
-                        current_enemy_index = i
+                        current_enemy_index = idx
                         special_attack_used = False
+                        enemy_turn_pending = False
+                        player_turn_done = False
+                        player_defending = False
+                        strength_active = False
                         break
                 continue
 
-            # Handle left click for upgrade button when upgrade menu is active
+            # Handle left click for upgrade button when upgrade menu is 
             if event.button == 1:
+                # ---------- PLAYER CLICK IN TRADE MENU ----------
                 if trade_menu_active:
                     # Remake the trade menu button rect exactly as in draw_trade_menu
                     box_w, box_h = 700, 520
@@ -1834,6 +2053,28 @@ while running:
                                     ax, ay = enemy_spawn_points[current_enemy_index]
                                     dead_enemies.add((*current_room, ax, ay))
 
+                                    # Award shards for normal enemy or mark boss defeated
+                                    try:
+                                        lvl_idx = current_room[0]
+                                        r_idx = current_room[1]
+                                        c_idx = current_room[2]
+                                    except Exception:
+                                        lvl_idx, r_idx, c_idx = 0, 0, 0
+
+                                    if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
+                                        boss_defeated[lvl_idx] = True
+                                        feedback, feedback_timer = "You defeated the boss!", 3.0
+                                    else:
+                                        inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
+                                        feedback, feedback_timer = "Gained 10 Enemy Shards!", 2.0
+
+                                    # Remove dead enemy entries from all lists so indexes stay correct
+                                    enemy_health.pop(current_enemy_index)
+                                    enemy_max_health.pop(current_enemy_index)
+                                    enemy_rects.pop(current_enemy_index)
+                                    enemy_tiles.pop(current_enemy_index)
+                                    enemy_spawn_points.pop(current_enemy_index)
+
                             elif name == "Special Attack":
                                 if special_attack_used:
                                     feedback, feedback_timer = "You already used Special Attack!", 2.0
@@ -1855,7 +2096,29 @@ while running:
                                     # Get room & enemy location
                                     rect = enemy_rects[current_enemy_index]
                                     ax, ay = enemy_spawn_points[current_enemy_index]
+
+                                    # Award shards for normal enemy or mark boss defeated
+                                    try:
+                                        lvl_idx = current_room[0]
+                                        r_idx = current_room[1]
+                                        c_idx = current_room[2]
+                                    except Exception:
+                                        lvl_idx, r_idx, c_idx = 0, 0, 0
+
+                                    if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
+                                        boss_defeated[lvl_idx] = True
+                                        feedback, feedback_timer = "You defeated the boss!", 3.0
+                                    else:
+                                        inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
+                                        feedback, feedback_timer = "Gained 10 Enemy Shards!", 2.0
+
                                     dead_enemies.add((*current_room, ax, ay))
+                                    # Remove dead enemy entries from all lists so indexes stay correct
+                                    enemy_health.pop(current_enemy_index)
+                                    enemy_max_health.pop(current_enemy_index)
+                                    enemy_rects.pop(current_enemy_index)
+                                    enemy_tiles.pop(current_enemy_index)
+                                    enemy_spawn_points.pop(current_enemy_index)
 
                             elif name == "Defend":
                                 player_defending = True
@@ -1887,8 +2150,14 @@ while running:
                                     continue
 
                             elif name == "Run":
-                                combat_active = False
-                                strength_active = False
+                                # 50/50 escape chance
+                                if random.random() < 0.5:
+                                    combat_active = False
+                                    strength_active = False
+                                else:
+                                    feedback, feedback_timer = "Failed to escape!", 2.0
+                                    enemy_turn_pending = True
+                                    enemy_turn_delay = enemy_delay_frames
                                 continue
 
                             # ----- BEGIN ENEMY TURN DELAY -----
@@ -2146,7 +2415,7 @@ while running:
         continue
 
     if combat_active:
-        # Enemy delayed turn logic STILL runs:
+        # Enemy delayed turn logic still runs:
         if enemy_turn_pending:
             if enemy_turn_delay > 0:
                 enemy_turn_delay -= 1
@@ -2285,5 +2554,4 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
-
 pygame.quit()
