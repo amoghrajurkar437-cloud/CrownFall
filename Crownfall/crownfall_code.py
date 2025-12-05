@@ -549,7 +549,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             if can_draw(500, y, c_Gold):    
                 draw_objects(500, y, "gold", surface)   #Gold
         if can_draw(189, -200, dead_enemies):
-            draw_objects(189, -200, "illager", surface) #Boss Illager
+            draw_objects(189, -200, "illager", surface) #Archie
 
     # ───────── LEVEL 2 ─────────
     # Level 2: Bottom Left
@@ -2554,4 +2554,5 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
+
 pygame.quit()
