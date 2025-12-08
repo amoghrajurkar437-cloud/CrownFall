@@ -234,6 +234,8 @@ tip_timer = 0
 # Track which bosses have been defeated
 # The [False] * LEVELS creates a list with one False per level
 boss_defeated = [False] * LEVELS
+boss_phase = [1] * LEVELS # Track which phase each boss is currently in
+boss_max_phases = 2 # Every boss has 2 phases
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -1948,10 +1950,25 @@ while running:
 
             # Award shards OR boss completion
             if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
-                # Boss room
+                # If boss still has phases left
+                if boss_phase[lvl_idx] < boss_max_phases:
+                    boss_phase[lvl_idx] += 1
+                    feedback, feedback_timer = f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0
+
+                    # Give new boss HP
+                    new_hp = 300 + lvl_idx * 100
+                    enemy_health[current_enemy_index] = new_hp
+                    enemy_max_health[current_enemy_index] = new_hp
+
+                    # Reset combat state
+                    special_attack_used = False
+                    strength_active = False
+                    player_turn_done = False
+                    combat_active = True
+                    continue  # DO NOT fall into the enemy-removal code
+
+                # Final phase defeated
                 boss_defeated[lvl_idx] = True
-                if all(boss_defeated):
-                    end_screen_active = True
             else:
                 # Normal enemy
                 inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
@@ -2177,11 +2194,28 @@ while running:
                                         lvl_idx, r_idx, c_idx = 0, 0, 0
 
                                     if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
+                                        # If boss still has phases left
+                                        if boss_phase[lvl_idx] < boss_max_phases:
+                                            boss_phase[lvl_idx] += 1
+                                            feedback, feedback_timer = f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0
+
+                                            # Give new boss HP
+                                            new_hp = 300 + lvl_idx * 100
+                                            enemy_health[current_enemy_index] = new_hp
+                                            enemy_max_health[current_enemy_index] = new_hp
+
+                                            # Reset combat state
+                                            special_attack_used = False
+                                            strength_active = False
+                                            player_turn_done = False
+                                            combat_active = True
+                                            continue  # DO NOT fall into the enemy-removal code
+
+                                        # Final phase defeated
                                         boss_defeated[lvl_idx] = True
-                                        feedback, feedback_timer = "You defeated the boss!", 3.0
                                     else:
                                         inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
-                                        feedback, feedback_timer = "Gained 10 Enemy Shards!", 2.0
+                                        draw_message("Gained 10 Enemy Shards!", 2.0, (0, 255, 0))
 
                                     # Remove dead enemy entries from all lists so indexes stay correct
                                     enemy_health.pop(current_enemy_index)
@@ -2221,11 +2255,28 @@ while running:
                                         lvl_idx, r_idx, c_idx = 0, 0, 0
 
                                     if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
+                                        # If boss still has phases left
+                                        if boss_phase[lvl_idx] < boss_max_phases:
+                                            boss_phase[lvl_idx] += 1
+                                            feedback, feedback_timer = f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0
+
+                                            # Give new boss HP
+                                            new_hp = 300 + lvl_idx * 100
+                                            enemy_health[current_enemy_index] = new_hp
+                                            enemy_max_health[current_enemy_index] = new_hp
+
+                                            # Reset combat state
+                                            special_attack_used = False
+                                            strength_active = False
+                                            player_turn_done = False
+                                            combat_active = True
+                                            continue  # DO NOT fall into the enemy-removal code
+
+                                        # Final phase defeated
                                         boss_defeated[lvl_idx] = True
-                                        feedback, feedback_timer = "You defeated the boss!", 3.0
                                     else:
                                         inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
-                                        feedback, feedback_timer = "Gained 10 Enemy Shards!", 2.0
+                                        draw_message("Gained 10 Enemy Shards!", 2.0, (0, 255, 0))
 
                                     dead_enemies.add((*current_room, ax, ay))
                                     # Remove dead enemy entries from all lists so indexes stay correct
