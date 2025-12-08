@@ -35,11 +35,11 @@ damage_multiplier = 1
 strength_multiplier = 2
 
 # Health set up
-health = 100
+health = 10
 max_health = 100
 
 # Inventory set up
-inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 0}
+inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 150}
 inventory_limits = {"Gold": 150, "Artifacts": 7, "Health Potions": 3, "Speed Potions": 3, "Strength Potions": 3, "Upgrade Tokens": 15}
 
 # Collected sets
@@ -76,6 +76,8 @@ enemy_turn_pending = False # Enemy is waiting to take its turn
 player_defending = False # Player is defending
 special_attack_used = False # Special attack used this turn
 strength_active = False # Strength potion in combat
+player_dead = False # Player death flag
+end_screen_active = False # End screen flag
 trade_prompt_key = None # Tracks which villager is offering trade
 trade_pending_key = None # Marks villager to show trade prompt after dialogue
 active_villager_index = None # Which villager for multiple in a room
@@ -84,7 +86,7 @@ previous_room = None # Tracks last room for enemy respawn logic
 
 # Armor and Weapons set up
 armor_level = 0  # Player's armor upgrade level (increases max health)
-weapon_level = 5  # Player's weapon upgrade level (increases damage)
+weapon_level = 0  # Player's weapon upgrade level (increases damage)
 inventory_level = 0  # Player's inventory-size upgrade level (increases limits)
 gold_pickup_level = 0  # Gold-per-pickup upgrade level
 # Base multipliers derived from upgrades
@@ -549,7 +551,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             if can_draw(500, y, c_Gold):    
                 draw_objects(500, y, "gold", surface)   #Gold
         if can_draw(189, -200, dead_enemies):
-            draw_objects(189, -200, "illager", surface) #Archie
+            draw_objects(189, -200, "illager", surface) #Boss Illager
 
     # ───────── LEVEL 2 ─────────
     # Level 2: Bottom Left
@@ -932,11 +934,7 @@ def draw_hud(surface):
     y = effect_box_y + 46
     if speed_potion_duration > 0:
         spd = font.render(f"Speed x{speed_multiplier} ({int(speed_potion_duration)}s)", True, (255, 255, 255))
-        surface.blit(spd, (effect_box_x + 16, y))
-        y += 28
-    if strength_active:
-        strn = font.render("Strength x2", True, (255, 255, 255))
-        surface.blit(strn, (effect_box_x + 16, y))
+        surface.blit(spd, (effect_box_x + effect_box_w // 2, y))
         y += 28
 
 # DRAWING TRADE PROMOPT
@@ -950,7 +948,7 @@ def draw_trade_prompt(surface):
     box_y = ROOM_HEIGHT - box_h - 20
     pygame.draw.rect(surface, (0, 0, 0), (box_x, box_y, box_w, box_h))
     pygame.draw.rect(surface, (255, 255, 255), (box_x, box_y, box_w, box_h), 3)
-    txt = font.render("Would u like to trade? (Y/N)", True, (255, 255, 255))
+    txt = font.render("Would you like to trade? (Y/N)", True, (255, 255, 255))
     trect = txt.get_rect(center=(box_x + box_w // 2, box_y + box_h // 2))
     surface.blit(txt, trect)
 
@@ -1448,7 +1446,7 @@ def draw_combat_screen(surface):
 # ENEMY TURN AI
 def run_enemy_turn():
     """Runs the enemy's turn in combat, choosing an action based on current health and state."""
-    global health, enemy_turn_pending, player_defending, enemy_heals_used, feedback, feedback_timer
+    global health, enemy_turn_pending, player_defending, enemy_heals_used, player_dead, combat_active, feedback, feedback_timer
 
     enemy_hp = enemy_health[current_enemy_index]
     enemy_max = enemy_max_health[current_enemy_index]
@@ -1502,6 +1500,12 @@ def run_enemy_turn():
 
         health -= final_dmg
         player_defending = False
+        health -= final_dmg
+        health = max(0, health)  # <-- keeps health from going below 0
+        player_defending = False
+        if health == 0:
+            combat_active = False
+            player_dead = True
 
     elif enemy_choice == "defend":
         enemy_defending = True
@@ -1515,6 +1519,86 @@ def run_enemy_turn():
 
     # Reset turn to people
     enemy_turn_pending = False
+
+# DRAWING DEATH SCREEN
+def draw_death_screen(surface):
+    global death_home_btn, death_load_btn
+
+    # --- FULLSCREEN BACKGROUND PANEL (same size as combat area) ---
+    # dark red transparent overlay
+    fullscreen_panel = pygame.Surface((ROOM_WIDTH, ROOM_HEIGHT), pygame.SRCALPHA)
+    fullscreen_panel.fill((120, 0, 0, 180))  # R, G, B, A
+    surface.blit(fullscreen_panel, (0, 0))
+
+    # --- CENTER PANEL (different color) ---
+    w, h = 600, 300
+    x = (ROOM_WIDTH - w) // 2
+    y = (ROOM_HEIGHT - h) // 2
+
+    center_panel = pygame.Surface((w, h), pygame.SRCALPHA)
+    center_panel.fill((0, 0, 0, 240))
+    surface.blit(center_panel, (x, y))
+    pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 4)
+
+    # --- TITLE TEXT ---
+    title = title_font.render("YOU HAVE DIED", True, (255, 80, 80))
+    surface.blit(title, title.get_rect(center=(x + w//2, y + 70)))
+
+    # --- HOME BUTTON ---
+    death_home_btn = pygame.Rect(x + 70, y + h - 120, 200, 70)
+    pygame.draw.rect(surface, (200, 160, 40) , death_home_btn)
+    pygame.draw.rect(surface, (255, 255, 255), death_home_btn, 3)
+
+    home_text = font.render("HOME", True, (255, 255, 255))
+    surface.blit(home_text, home_text.get_rect(center=death_home_btn.center))
+
+    # --- LOAD BUTTON ---
+    death_load_btn = pygame.Rect(x + w - 270, y + h - 120, 200, 70)
+    pygame.draw.rect(surface, (80, 200, 110), death_load_btn)
+    pygame.draw.rect(surface, (255, 255, 255), death_load_btn, 3)
+
+    load_text = font.render("LOAD", True, (255, 255, 255))
+    surface.blit(load_text, load_text.get_rect(center=death_load_btn.center))
+
+# DRAWING END SCREEN
+def draw_end_screen(surface):
+    global end_home_btn, end_return_btn
+
+    # Background overlay
+    overlay = pygame.Surface((ROOM_WIDTH, ROOM_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 200))
+    surface.blit(overlay, (0, 0))
+
+    # Center panel
+    w, h = 700, 400
+    x = (ROOM_WIDTH - w) // 2
+    y = (ROOM_HEIGHT - h) // 2
+    panel = pygame.Surface((w, h), pygame.SRCALPHA)
+    panel.fill((15, 15, 25, 240))
+    surface.blit(panel, (x, y))
+    pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 3)
+
+    # Title
+    title = title_font.render("VICTORY!", True, (255, 220, 80))
+    surface.blit(title, title.get_rect(center=(x + w//2, y + 80)))
+
+    # Under-text
+    msg = font.render("All 3 bosses have been defeated.", True, (255, 255, 255))
+    surface.blit(msg, msg.get_rect(center=(x + w//2, y + 150)))
+
+    # HOME button
+    end_home_btn = pygame.Rect(x + 70, y + h - 120, 240, 70)
+    pygame.draw.rect(surface, (80, 180, 250), end_home_btn)
+    pygame.draw.rect(surface, (255, 255, 255), end_home_btn, 3)
+    home_text = font.render("HOME", True, (255, 255, 255))
+    surface.blit(home_text, home_text.get_rect(center=end_home_btn.center))
+
+    # RETURN button
+    end_return_btn = pygame.Rect(x + w - 310, y + h - 120, 240, 70)
+    pygame.draw.rect(surface, (80, 200, 120), end_return_btn)
+    pygame.draw.rect(surface, (255, 255, 255), end_return_btn, 3)
+    return_text = font.render("RETURN", True, (255, 255, 255))
+    surface.blit(return_text, return_text.get_rect(center=end_return_btn.center))
 
 # DRAWING MINIMAP
 def draw_minimap(surface, level, row, col):
@@ -1739,7 +1823,7 @@ def room_transition():
     if at_level_up_corner:
             # Prevent advancing to next level until boss in this level is defeated.
         if not boss_defeated[level]:
-            feedback, feedback_timer = "You must defeat the boss before advancing to the next level!", 3.0
+            draw_message(screen, "You must defeat the boss before advancing to the next level!", 2.0, (255, 0, 0))
             # Keep player inside the room boundary (prevent accidental transition)
             player.top = 0
             player.right = ROOM_WIDTH
@@ -1805,6 +1889,33 @@ def shards_required_for_level(level_index):
     """Returns the number of Enemy Shards required to unlock the boss fight for the given level index."""
     return 30 + level_index * 60
 
+#Reseying the game state
+def reset_game():
+    global health, max_health, inventory, player, current_room, player_dead
+    global visited_rooms, minimap_memory, combat_active
+    global trade_menu_active, trading_prompt_active, dialogue_active
+    global loading_screen_active, instructions_active, hud_visible, map_visible
+
+    health = 100
+    max_health = 100
+    player.x, player.y = 50, ROOM_HEIGHT - 100
+    current_room[:] = [0, 0, 0]
+
+    inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 0}
+
+    visited_rooms.clear()
+    minimap_memory.clear()
+
+    combat_active = False
+    player_dead = False
+    trade_menu_active = False
+    trading_prompt_active = False
+    dialogue_active = False
+    loading_screen_active = False
+    instructions_active = False
+    hud_visible = False
+    map_visible = False
+
 # MAIN LOOP
 running = True
 while running:
@@ -1839,6 +1950,8 @@ while running:
             if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
                 # Boss room
                 boss_defeated[lvl_idx] = True
+                if all(boss_defeated):
+                    end_screen_active = True
             else:
                 # Normal enemy
                 inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
@@ -1952,7 +2065,9 @@ while running:
                         if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
                             required = shards_required_for_level(lvl_idx)
                             if inventory.get("Enemy Shards", 0) < required:
-                                feedback, feedback_timer = "You need more Enemy Shards before you can confront the boss!", 2.5
+                                message = "You need more Enemy Shards before you can confront the boss!"
+                                message_color = (255, 0, 0)
+                                message_timer = 2.5
                                 continue  # Blocks boss fight
 
                         # Start combat
@@ -2421,11 +2536,47 @@ while running:
                 enemy_turn_delay -= 1
             else:
                 run_enemy_turn()   # <-- I'll give you this block below
-
         combat_buttons = draw_combat_screen(screen)
         pygame.display.flip()
         continue  # <-- THIS MUST BE HERE to stop overworld from drawing
 
+    # Death screen click handling
+    if player_dead and event.type == pygame.MOUSEBUTTONDOWN:
+        if death_home_btn.collidepoint(event.pos):
+            reset_game()
+            on_home = True
+            player_dead = False
+            continue
+
+        if death_load_btn.collidepoint(event.pos):
+            print("Load")
+            # (later you load save data here)
+            continue
+
+    if player_dead:
+        draw_death_screen(screen)
+        pygame.display.flip()
+        continue
+
+    if end_screen_active:
+        draw_end_screen(screen)
+        pygame.display.flip()
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            
+            # Go to Home Screen
+            if end_home_btn.collidepoint(event.pos):
+                reset_game()
+                on_home = True
+                end_screen_active = False
+                continue
+
+            # Return to game
+            if end_return_btn.collidepoint(event.pos):
+                end_screen_active = False
+                continue
+
+        continue
 
     # ---------- GAMEPLAY ----------
     mv_x = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
@@ -2554,5 +2705,4 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
-
 pygame.quit()
