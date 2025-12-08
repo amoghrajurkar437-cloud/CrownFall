@@ -546,12 +546,15 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 1: Top Right
     elif level == 0 and row == 2 and col == 2:
-        for x in [498, 499, 500, 501, 502, 503, 504, 505, 506]:
+        for x in [498, 499, 500, 501]:
             if can_draw(x, 150, c_Gold):   
                 draw_objects(x, 150, "gold", surface)   #Gold
-        for y in [150, 151, 152, 153, 154, 155, 156, 157, 158]:
+        for y in [150, 151, 152, 153]:
             if can_draw(500, y, c_Gold):    
                 draw_objects(500, y, "gold", surface)   #Gold
+        for x in [475, 480]:
+            if can_draw(x, 250, c_Health_Potions):
+                draw_objects(x, 250, "health_potion", surface)
         if can_draw(189, -200, dead_enemies):
             draw_objects(189, -200, "illager", surface) #Boss Illager
 
@@ -666,6 +669,15 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
     elif level == 1 and row == 2 and col == 2:
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
+        for x in [300, 301, 302, 303, 304, 305, 306]:
+            draw_objects(x, 200, "gold", surface)   #Gold pile boss drop
+        if can_draw(290, 200, c_Health_Potions):    #Health potion boss drop
+            draw_objects(290, 200, "health_potion", surface)
+        if can_draw(290, 400, c_Speed_Potions):
+            draw_objects(290, 400, "speed_potion", surface)
+        for x in [300, 301]:
+            if can_draw(x, 300, c_Strength_Potions):
+                draw_objects(x, 300, "strength_potion", surface)
         if can_draw(200, 50, dead_enemies):
             draw_objects(200, 50, "king", surface) # Boss King Tower
 
@@ -2756,4 +2768,5 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
+
 pygame.quit()
