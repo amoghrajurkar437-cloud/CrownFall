@@ -34,7 +34,7 @@ damage_multiplier = 1
 strength_multiplier = 2
 
 # Health set up
-health = 1
+health = 50
 max_health = 100
 
 # Inventory set up
@@ -73,6 +73,7 @@ combat_active = False # Combat flag
 player_turn_done = False # Player has acted this turn
 enemy_turn_pending = False # Enemy is waiting to take its turn
 player_defending = False # Player is defending
+enemy_defending = False # Enemy  is defending
 special_attack_used = False # Special attack used this turn
 strength_active = False # Strength potion in combat
 player_dead = False # Player death flag
@@ -1474,8 +1475,12 @@ def run_enemy_turn():
         heal_weight = 50 if low_hp else 10
         weights.append(("heal", heal_weight))
 
-    defend_weight = 40 if low_hp else 20
-    weights.append(("defend", defend_weight))
+    if enemy_defending:
+        defend_weight = 10 if low_hp else 5
+        weights.append(("defend", defend_weight))
+    else:
+        defend_weight = 40 if low_hp else 20
+        weights.append(("defend", defend_weight))
 
     attack_weight = 40
     weights.append(("attack", attack_weight))
@@ -1941,7 +1946,7 @@ def shards_required_for_level(level_index):
 
 #Reseying the game state
 def reset_game():
-    global health, max_health, inventory, player, current_room, player_dead
+    global health, max_health, inventory, player, current_room, player_dead, speed_potion_duration
     global visited_rooms, minimap_memory, combat_active
     global trade_menu_active, trading_prompt_active, dialogue_active
     global loading_screen_active, instructions_active, hud_visible, map_visible
@@ -1950,6 +1955,7 @@ def reset_game():
     max_health = 100
     player.x, player.y = 50, ROOM_HEIGHT - 100
     current_room[:] = [0, 0, 0]
+    speed_potion_duration = 0
 
     inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 0}
 
