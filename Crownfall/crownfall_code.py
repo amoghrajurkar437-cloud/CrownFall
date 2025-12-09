@@ -236,27 +236,6 @@ boss_defeated = [False] * LEVELS
 boss_phase = [1] * LEVELS # Track which phase each boss is currently in
 boss_max_phases = 2 # Every boss has 2 phases
 level_passed = [False, False]
-# Boss-specific drops
-boss_drops = {
-    "illager": {
-        "Gold": 50,
-        "Artifacts": 1,
-        "Upgrade Tokens": 2
-    },
-    "king": {
-        "Gold": 150,
-        "Artifacts": 2,
-        "Upgrade Tokens": 5,
-        "Strength Potions": 1
-    },
-    "chief": {
-        "Gold": 300,
-        "Artifacts": 3,
-        "Upgrade Tokens": 7,
-        "Health Potions": 1,
-        "Speed Potions": 1
-    }
-}
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -697,8 +676,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         for x in [300, 301]:
             if can_draw(x, 300, c_Strength_Potions):
                 draw_objects(x, 300, "strength_potion", surface) # Strength potion
-        if can_draw(200, 100, c_Artifacts):
-            draw_objects(200, 100, "artifact", surface) # Artifact
+        if can_draw(150, 100, c_Artifacts):
+            draw_objects(150, 100, "artifact", surface) # Artifact
         if can_draw(200, 50, dead_enemies):
             draw_objects(200, 50, "king", surface) # Boss King Tower
 
