@@ -34,7 +34,7 @@ damage_multiplier = 1
 strength_multiplier = 2
 
 # Health set up
-health = 50
+health = 100
 max_health = 100
 
 # Inventory set up
@@ -49,7 +49,7 @@ c_Speed_Potions = set()
 c_Strength_Potions = set()
 
 # Minimap
-visited_rooms = set()
+visited_rooms = set() # Tracks rooms the player has visited
 minimap_memory = {} # Keeps icons permanently once discovered
 
 # On-screen notifications
@@ -60,7 +60,7 @@ feedback = ""
 feedback_timer = 0.0
 
 # Flag variables
-on_home = True # Player starts in home area
+on_home = True # Player starts in home screen
 hud_visible = False # HUD hidden by default
 map_visible = False # Map hidden by default
 dialogue_active = False # No dialogue active at start
@@ -73,7 +73,7 @@ combat_active = False # Combat flag
 player_turn_done = False # Player has acted this turn
 enemy_turn_pending = False # Enemy is waiting to take its turn
 player_defending = False # Player is defending
-enemy_defending = False # Enemy  is defending
+enemy_defending = False # Enemy is defending
 special_attack_used = False # Special attack used this turn
 strength_active = False # Strength potion in combat
 player_dead = False # Player death flag
@@ -1310,7 +1310,7 @@ def draw_loading_screen(surface):
     surface.blit(panel, (x, y))
     pygame.draw.rect(surface, (255, 255, 255), (x, y, w, h), 3)
 
-    title = title_font.render("CROWNFALL", True, (255, 255, 255))
+    title = title_font.render("LOADING...", True, (255, 255, 255))
     surface.blit(title, title.get_rect(center=(x + w//2, y + 60)))
 
     lore = [
@@ -1411,6 +1411,35 @@ def draw_combat_screen(surface):
             btn_rects.append((rect, btn_names[idx]))
             idx += 1
 
+            # --- POTION HOVER TOOLTIP ---
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            item_info_text = None
+            if rect.collidepoint(mouse_x, mouse_y):
+                if btn_names[idx-1] == "Health Potion":
+                    count = inventory.get("Health Potions", 0)
+                    item_info_text = f"{count} left (Heals 20 HP)"
+                elif btn_names[idx-1] == "Strength Potion":
+                    count = inventory.get("Strength Potions", 0)
+                    item_info_text = f"{count} left (Double Damage on all attacks)"
+                elif btn_names[idx-1] == "Special Attack":
+                    item_info_text = "Triple damage for 1 turn" 
+                else:
+                    item_info_text = None
+
+                if item_info_text:
+                    tip_surf = font.render(item_info_text, True, (255, 255, 255))
+
+                    # tooltip background
+                    pad = 6
+                    box_w = tip_surf.get_width() + pad * 2
+                    box_h = tip_surf.get_height() + pad * 2
+                    box_x = rect.centerx - box_w // 2
+                    box_y = rect.top - box_h - 8  # Above the button
+
+                    pygame.draw.rect(surface, (0, 0, 0), (box_x, box_y, box_w, box_h))
+                    pygame.draw.rect(surface, (255, 255, 255), (box_x, box_y, box_w, box_h), 2)
+                    surface.blit(tip_surf, (box_x + pad, box_y + pad))
+
     # Turn counter
     turn_text = "PLAYER TURN" if not enemy_turn_pending else "ENEMY TURN"
     color = (0,255,0) if turn_text == "PLAYER TURN" else (255,100,100)
@@ -1454,7 +1483,7 @@ def draw_combat_screen(surface):
     # On screen feedback
     if feedback and feedback_timer > 0:
         fb_surf = font.render(feedback, True, (255,255,255))
-        fb_rect = fb_surf.get_rect(center=(x + w//2, start_y - 40))
+        fb_rect = fb_surf.get_rect(center=(x + w//2, start_y - 75))
         surface.blit(fb_surf, fb_rect)
     return btn_rects
 
@@ -1522,7 +1551,7 @@ def run_enemy_turn():
                 # 25% full hit
                 final_dmg = dmg
                 feedback, feedback_timer = f"Enemy hits you for {final_dmg} damage!", 2.0
-            elif roll < 0.75:
+            elif roll < 0.75 and roll >= 0.25:
                 # 50% half damage
                 final_dmg = dmg // 2
                 feedback, feedback_timer = f"Enemy partially hits you for {final_dmg} damage!", 2.0
@@ -1544,6 +1573,7 @@ def run_enemy_turn():
 
     elif enemy_choice == "defend":
         enemy_defending = True
+        print(enemy_defending)
         feedback, feedback_timer = "Enemy defends!", 2.0
 
     elif enemy_choice == "heal":
@@ -1946,16 +1976,16 @@ def shards_required_for_level(level_index):
 
 #Reseying the game state
 def reset_game():
-    global health, max_health, inventory, player, current_room, player_dead, speed_potion_duration
+    """Resets all game state variables to their initial values for a new game."""
+    global health, max_health, inventory, player, current_room, player_dead
     global visited_rooms, minimap_memory, combat_active
     global trade_menu_active, trading_prompt_active, dialogue_active
-    global loading_screen_active, instructions_active, hud_visible, map_visible
+    global loading_screen_active, instructions_active, hud_visible, map_visible, speed_potion_duration
 
     health = 100
     max_health = 100
     player.x, player.y = 50, ROOM_HEIGHT - 100
     current_room[:] = [0, 0, 0]
-    speed_potion_duration = 0
 
     inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 0}
 
@@ -1971,6 +2001,7 @@ def reset_game():
     instructions_active = False
     hud_visible = False
     map_visible = False
+    speed_potion_duration = 0
 
 # MAIN LOOP
 running = True
@@ -2225,8 +2256,24 @@ while running:
                                 else:
                                     damage_multiplier = weapon_base_multiplier * weapon_scale
                                 damage = int(10 * damage_multiplier)
-                                enemy_health[current_enemy_index] -= damage
-                                feedback, feedback_timer = f"You attacked for {damage} damage!", 2.0
+
+                                # Enemy defending logic (25% full hit, 50% half, 25% miss)
+                                if enemy_defending:
+                                    roll = random.random()
+                                    if roll < 0.25:
+                                        # 25% full hit
+                                        final_damage = damage
+                                    elif roll < 0.75 and roll >= 0.25:
+                                        # 50% half hit
+                                        final_damage = damage // 2
+                                    else:
+                                        # 25% miss
+                                        final_damage = 0
+                                    enemy_defending = False  # defense lasts only one turn
+                                else:
+                                    final_damage = damage
+                                enemy_health[current_enemy_index] -= final_damage
+                                feedback, feedback_timer = f"You attacked for {final_damage} damage!", 2.0
                                 enemy_turn_pending = True
                                 enemy_turn_delay = enemy_delay_frames
                                 if enemy_health[current_enemy_index] <= 0:
@@ -2286,10 +2333,27 @@ while running:
                                     damage_multiplier = strength_multiplier * weapon_scale
                                 else:
                                     damage_multiplier = weapon_base_multiplier * weapon_scale
-                                damage = int(20 * damage_multiplier)
-                                enemy_health[current_enemy_index] -= damage
+                                damage = int(30 * damage_multiplier)
+
+                                # Enemy defending logic (25% full hit, 50% half, 25% miss)
+                                if enemy_defending:
+                                    roll = random.random()
+                                    if roll < 0.25:
+                                        # 25% full hit
+                                        final_damage = damage
+                                    elif roll < 0.75 and roll >= 0.25:
+                                        # 50% half hit
+                                        final_damage = damage // 2
+                                    else:
+                                        # 25% miss
+                                        final_damage = 0
+                                    enemy_defending = False  # defense lasts only one turn
+                                else:
+                                    final_damage = damage
+
+                                enemy_health[current_enemy_index] -= final_damage
                                 special_attack_used = True
-                                feedback, feedback_timer = f"You used SPECIAL ATTACK for {damage} damage!", 2.0
+                                feedback, feedback_timer = f"You used SPECIAL ATTACK for {final_damage} damage!", 2.0
                                 enemy_turn_pending = True
                                 enemy_turn_delay = enemy_delay_frames
                                 if enemy_health[current_enemy_index] <= 0:
@@ -2639,7 +2703,7 @@ while running:
             if enemy_turn_delay > 0:
                 enemy_turn_delay -= 1
             else:
-                run_enemy_turn()   # <-- I'll give you this block below
+                run_enemy_turn()
         combat_buttons = draw_combat_screen(screen)
         pygame.display.flip()
         continue  # <-- THIS MUST BE HERE to stop overworld from drawing
