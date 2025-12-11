@@ -108,6 +108,7 @@ water_tiles = []
 villager_tiles = []
 upgrade_hut_tiles = []
 enemy_tiles = []
+campfire_tiles = []
 
 # Dialogue set up
 dialogue_index = 0
@@ -237,7 +238,7 @@ level_passed = [False, False]
 
 # Health set up
 max_health = 100 + armor_level * 100
-health = max_health 
+health = max_health - 50
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -275,6 +276,8 @@ def draw_objects(x, y, obj_type, surface):
             return w * 1.5, h * 1.5
         elif name in scale_down_list:
             return w * .75, h * .75
+        elif name == "campfire":
+            return w * 2, h * 2
         else:
             return w, h
 
@@ -370,7 +373,11 @@ def draw_objects(x, y, obj_type, surface):
         colliders.append(rect)
         upgrade_hut_tiles.append(rect)
         return rect
-
+    elif obj_type == "campfire":
+        rect = load_img("Campfire", 100, 100)
+        colliders.append(rect)
+        campfire_tiles.append(rect)
+        return rect
     # Collectibles 
     elif obj_type == "artifact":
         rect = load_img("Artifact", 40, 40)
@@ -633,6 +640,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         for x in [-100,0,200,400,600]:
             draw_objects(x, 0, "wall1", surface) # Wall 1
         draw_objects(100, 350, "tree1", surface) # Tree 1
+        draw_objects(300, 250, "campfire", surface) # Campfire
         if can_draw(500, 300, c_Artifacts):
             draw_objects(500, 300, "artifact", surface) # Artifact
 
@@ -2113,6 +2121,21 @@ while running:
                 player.x, player.y = 50, ROOM_HEIGHT - 100
             continue
 
+        if campfire_tiles and player.colliderect(campfire_tiles[0].inflate(60, 60)):
+            healing_at_campfire = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_h:
+                if health >= max_health:
+                    message, message_timer, message_color = "Health already full!", 1.0, (255, 255, 0)
+                healing_at_campfire = True
+                if healing_at_campfire:
+                    health = min(max_health, health + 0.1 * dt)
+                    if health == max_health:
+                        message, message_timer, message_color = "Health fully restored!", 1.0, (0, 255, 0)
+                        healing_at_campfire = False
+                    else:
+                        message, message_timer, message_color = f"Healing... Health {int(health)}", 0.5, (0, 255, 0)
+                    continue
+
         # ----- Mouse interactions -----
         if event.type == pygame.MOUSEBUTTONDOWN and not on_home:
             # ---Villager interactions---
@@ -2142,11 +2165,7 @@ while running:
                         # Start dialogue always
                         level, row, col = current_room
                         key = (level, row, col, i)
-                        current_dialogue = list(dialogues.get(
-                            key,
-                            ["Villager: Hello there!",
-                            "Villager: Sorry, I don't have much to say."]
-                        ))
+                        current_dialogue = list(dialogues.get(key, ["Villager: Hello there!", "Villager: Sorry, I don't have much to say."]))
                         dialogue_index = 0
                         dialogue_active = True
                         active_villager_index = i
