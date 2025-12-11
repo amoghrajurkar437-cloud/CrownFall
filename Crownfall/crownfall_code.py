@@ -22,6 +22,7 @@ player = pygame.Rect(50, ROOM_HEIGHT - 100, 50, 50)
 facing = "up" # Track direction player is facing
 player_color = (255, 255, 0)
 current_room = [0, 0, 0]
+current_level = current_room[0]
 room_colliders = {}
 
 # Speed setup
@@ -32,10 +33,6 @@ speed_multiplier = 2
 # Strength setup
 damage_multiplier = 1
 strength_multiplier = 2
-
-# Health set up
-health = 100
-max_health = 100
 
 # Inventory set up
 inventory = {"Gold": 150, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
@@ -85,8 +82,8 @@ current_enemy_index = None # Which enemy for multiple in a room
 previous_room = None # Tracks last room for enemy respawn logic
 
 # Armor and Weapons set up
-armor_level = 0  # Player's armor upgrade level (increases max health)
-weapon_level = 0  # Player's weapon upgrade level (increases damage)
+armor_level = 2  # Player's armor upgrade level (increases max health)
+weapon_level = 5  # Player's weapon upgrade level (increases damage)
 inventory_level = 0  # Player's inventory-size upgrade level (increases limits)
 gold_pickup_level = 0  # Gold-per-pickup upgrade level
 # Base multipliers derived from upgrades
@@ -237,6 +234,10 @@ boss_defeated = [False] * LEVELS
 boss_phase = [1] * LEVELS # Track which phase each boss is currently in
 boss_max_phases = 2 # Every boss has 2 phases
 level_passed = [False, False]
+
+# Health set up
+max_health = 100 + armor_level * 100
+health = max_health 
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -1134,7 +1135,7 @@ def draw_upgrade_menu(surface):
     next_cost_gold, next_cost_token = get_costs_for_level(cur_level)
     # Benefit description based on category
     if sel_cat == "Armor":
-        benefit_desc = f"+50 Max Health per level"
+        benefit_desc = f"+100 Max Health per level"
     elif sel_cat == "Weapons":
         benefit_desc = f"x1.5 damage multiplier per level"
     elif sel_cat == "Inventory":
@@ -1417,7 +1418,7 @@ def draw_combat_screen(surface):
             if rect.collidepoint(mouse_x, mouse_y):
                 if btn_names[idx-1] == "Health Potion":
                     count = inventory.get("Health Potions", 0)
-                    item_info_text = f"{count} left (Heals 20 HP)"
+                    item_info_text = f"{count} left (Heals 25 HP)"
                 elif btn_names[idx-1] == "Strength Potion":
                     count = inventory.get("Strength Potions", 0)
                     item_info_text = f"{count} left (Double Damage on all attacks)"
@@ -1570,10 +1571,10 @@ def run_enemy_turn():
         if health == 0:
             combat_active = False
             player_dead = True
+            boss_phase[current_room[0]] = 1  # reset boss phase on death
 
     elif enemy_choice == "defend":
         enemy_defending = True
-        print(enemy_defending)
         feedback, feedback_timer = "Enemy defends!", 2.0
 
     elif enemy_choice == "heal":
@@ -1981,11 +1982,17 @@ def reset_game():
     global visited_rooms, minimap_memory, combat_active
     global trade_menu_active, trading_prompt_active, dialogue_active
     global loading_screen_active, instructions_active, hud_visible, map_visible, speed_potion_duration
+    global boss_phase, current_level, arrmor_upgrade_level, weapon_upgrade_level
+    global inventory_level, gold_pickup_level
 
     health = 100
     max_health = 100
     player.x, player.y = 50, ROOM_HEIGHT - 100
     current_room[:] = [0, 0, 0]
+    arrmor_upgrade_level = 0
+    weapon_upgrade_level = 0
+    inventory_level = 0
+    gold_pickup_level = 0
 
     inventory = {"Gold": 0, "Artifacts": 0, "Health Potions": 0, "Speed Potions": 0, "Strength Potions": 0, "Upgrade Tokens": 0, "Enemy Shards": 0}
 
@@ -2002,6 +2009,7 @@ def reset_game():
     hud_visible = False
     map_visible = False
     speed_potion_duration = 0
+    boss_phase[current_room[0]] = 1
 
 # MAIN LOOP
 running = True
@@ -2033,40 +2041,49 @@ while running:
             ax, ay = enemy_spawn_points[current_enemy_index]
             dead_enemies.add((*current_room, ax, ay))
 
-            # Award shards OR boss completion
-            if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:
-                # If boss still has phases left
+            # Award shards OR handle boss phases
+            if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:  
+                # --- BOSS ROOM ---
+
+                # If boss still has another phase
                 if boss_phase[lvl_idx] < boss_max_phases:
                     boss_phase[lvl_idx] += 1
-                    feedback, feedback_timer = f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0
+                    feedback, feedback_timer = (f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0)
 
-                    # Give new boss HP
+                    # Restore boss HP for new phase
                     new_hp = 300 + lvl_idx * 100
                     enemy_health[current_enemy_index] = new_hp
                     enemy_max_health[current_enemy_index] = new_hp
 
-                    # Reset combat state
-                    special_attack_used = False
-                    strength_active = False
+                    # Reset combat state for new phase
                     player_turn_done = False
                     combat_active = True
-                    continue  # DO NOT fall into the enemy-removal code
+                    continue  
 
-                # Final phase defeated
+                # -------- FINAL PHASE DEFEATED --------
                 boss_defeated[lvl_idx] = True
+                dead_enemies.add((*current_room, ax, ay))
+
+                # Remove boss from all enemy lists
+                enemy_health.pop(current_enemy_index)
+                enemy_max_health.pop(current_enemy_index)
+                enemy_rects.pop(current_enemy_index)
+                enemy_tiles.pop(current_enemy_index)
+                enemy_spawn_points.pop(current_enemy_index)
+                continue
+
             else:
-                # Normal enemy
+                # --- NORMAL ENEMY ---
                 inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
+                dead_enemies.add((*current_room, ax, ay))
 
-            # Remove enemy from all lists
-            enemy_health.pop(current_enemy_index)
-            enemy_max_health.pop(current_enemy_index)
-            enemy_rects.pop(current_enemy_index)
-            enemy_tiles.pop(current_enemy_index)
-            enemy_spawn_points.pop(current_enemy_index)
-            continue
-
-
+                # Remove enemy normally
+                enemy_health.pop(current_enemy_index)
+                enemy_max_health.pop(current_enemy_index)
+                enemy_rects.pop(current_enemy_index)
+                enemy_tiles.pop(current_enemy_index)
+                enemy_spawn_points.pop(current_enemy_index)
+                continue
 
         if event.type == pygame.QUIT:
             running = False
@@ -2278,11 +2295,9 @@ while running:
                                 enemy_turn_delay = enemy_delay_frames
                                 if enemy_health[current_enemy_index] <= 0:
                                     combat_active = False
-                                    strength_active = False
                                     # Get room & enemy location
                                     rect = enemy_rects[current_enemy_index]
                                     ax, ay = enemy_spawn_points[current_enemy_index]
-                                    dead_enemies.add((*current_room, ax, ay))
 
                                     # Award shards for normal enemy or mark boss defeated
                                     try:
@@ -2304,19 +2319,17 @@ while running:
                                             enemy_max_health[current_enemy_index] = new_hp
 
                                             # Reset combat state
-                                            special_attack_used = False
-                                            strength_active = False
                                             player_turn_done = False
                                             combat_active = True
                                             continue  # DO NOT fall into the enemy-removal code
-
-                                        # Final phase defeated
-                                        boss_defeated[lvl_idx] = True
+                                        else:
+                                            # Final phase defeated
+                                            boss_defeated[lvl_idx] = True
+                                            strength_active = False
                                     else:
                                         inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
                                         draw_message(screen, "Gained 10 Enemy Shards!", 2.0, (0, 255, 0))
-
-                                    dead_enemies.add((*current_room, ax, ay))
+                                        dead_enemies.add((*current_room, ax, ay))
                                     # Remove dead enemy entries from all lists so indexes stay correct
                                     enemy_health.pop(current_enemy_index)
                                     enemy_max_health.pop(current_enemy_index)
@@ -2383,19 +2396,19 @@ while running:
                                             enemy_max_health[current_enemy_index] = new_hp
 
                                             # Reset combat state
-                                            special_attack_used = False
-                                            strength_active = False
                                             player_turn_done = False
                                             combat_active = True
                                             continue  # DO NOT fall into the enemy-removal code
-
-                                        # Final phase defeated
-                                        boss_defeated[lvl_idx] = True
+                                        else:
+                                            # Final phase defeated
+                                            boss_defeated[lvl_idx] = True
+                                            dead_enemies.add((*current_room, ax, ay))
                                     else:
                                         inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
                                         draw_message(screen, "Gained 10 Enemy Shards!", 2.0, (0, 255, 0))
-
-                                    dead_enemies.add((*current_room, ax, ay))
+                                        # Mark enemy as dead
+                                        dead_enemies.add((*current_room, ax, ay))
+                                        strength_active = False
                                     # Remove dead enemy entries from all lists so indexes stay correct
                                     enemy_health.pop(current_enemy_index)
                                     enemy_max_health.pop(current_enemy_index)
@@ -2410,6 +2423,9 @@ while running:
                                 enemy_turn_delay = enemy_delay_frames
 
                             elif name == "Strength Potion":
+                                if strength_active:
+                                    feedback, feedback_timer = "You are already strong!", 2.0
+                                    continue
                                 if inventory["Strength Potions"] > 0:
                                     inventory["Strength Potions"] -= 1
                                     strength_active = True
