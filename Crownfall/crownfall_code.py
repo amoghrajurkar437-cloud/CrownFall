@@ -277,7 +277,7 @@ def draw_objects(x, y, obj_type, surface):
         elif name in scale_down_list:
             return w * .75, h * .75
         elif name == "campfire":
-            return w * 2, h * 2
+            return w * 5, h * 5
         else:
             return w, h
 
@@ -374,7 +374,7 @@ def draw_objects(x, y, obj_type, surface):
         upgrade_hut_tiles.append(rect)
         return rect
     elif obj_type == "campfire":
-        rect = load_img("Campfire", 100, 100)
+        rect = load_img("Campfire", 200, 200)
         colliders.append(rect)
         campfire_tiles.append(rect)
         return rect
@@ -2313,7 +2313,6 @@ while running:
                                 enemy_turn_pending = True
                                 enemy_turn_delay = enemy_delay_frames
                                 if enemy_health[current_enemy_index] <= 0:
-                                    combat_active = False
                                     # Get room & enemy location
                                     rect = enemy_rects[current_enemy_index]
                                     ax, ay = enemy_spawn_points[current_enemy_index]
@@ -2336,16 +2335,19 @@ while running:
                                             new_hp = 300 + lvl_idx * 100
                                             enemy_health[current_enemy_index] = new_hp
                                             enemy_max_health[current_enemy_index] = new_hp
-
                                             # Reset combat state
                                             player_turn_done = False
                                             combat_active = True
                                             continue  # DO NOT fall into the enemy-removal code
                                         else:
                                             # Final phase defeated
-                                            boss_defeated[lvl_idx] = True
+                                            combat_active = False
                                             strength_active = False
+                                            boss_defeated[lvl_idx] = True
+                                            dead_enemies.add((*current_room, ax, ay))
                                     else:
+                                        strength_active = False
+                                        combat_active = False
                                         inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
                                         draw_message(screen, "Gained 10 Enemy Shards!", 2.0, (0, 255, 0))
                                         dead_enemies.add((*current_room, ax, ay))
@@ -2389,8 +2391,6 @@ while running:
                                 enemy_turn_pending = True
                                 enemy_turn_delay = enemy_delay_frames
                                 if enemy_health[current_enemy_index] <= 0:
-                                    combat_active = False
-                                    strength_active = False
                                     # Get room & enemy location
                                     rect = enemy_rects[current_enemy_index]
                                     ax, ay = enemy_spawn_points[current_enemy_index]
@@ -2420,9 +2420,13 @@ while running:
                                             continue  # DO NOT fall into the enemy-removal code
                                         else:
                                             # Final phase defeated
+                                            strength_active = False
+                                            combat_active = False
                                             boss_defeated[lvl_idx] = True
                                             dead_enemies.add((*current_room, ax, ay))
                                     else:
+                                        strength_active = False
+                                        combat_active = False
                                         inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
                                         draw_message(screen, "Gained 10 Enemy Shards!", 2.0, (0, 255, 0))
                                         # Mark enemy as dead
