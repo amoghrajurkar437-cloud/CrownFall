@@ -19,7 +19,7 @@ font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 20)
 title_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 80)
 
 # Player and Room setup
-player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
+player = pygame.Rect(50, ROOM_HEIGHT - 100, 50, 50)
 facing = "up"
 current_room = [0, 0, 0]
 current_level = current_room[0]
@@ -257,7 +257,7 @@ for direction in player_images:
         img = pygame.image.load(
             f"crownfall_images/{direction.capitalize()}/{direction.capitalize()}_{i}.png"
         ).convert_alpha()
-        img = pygame.transform.scale(img, (80, 80))
+        img = pygame.transform.scale(img, (50, 50))
         player_images[direction].append(img)
 
 # DRAWING ELEMENTS
@@ -2953,4 +2953,5 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
+
 pygame.quit()
