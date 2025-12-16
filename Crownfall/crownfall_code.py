@@ -1,7 +1,24 @@
 # Amogh R and Sebastian M || CROWNFALL
-import pygame, os, math, random
+import pygame, os, math, random, json
 pygame.init()
 os.chdir(os.path.dirname(__file__))  # Make working dir = script folder
+
+# SAVE/LOAD FUNCTIONALITY
+SAVE_DIR = "crownfall_saves"
+SAVE_FILES = [
+    os.path.join(SAVE_DIR, "Save_1.txt"),
+    os.path.join(SAVE_DIR, "Save_2.txt"),
+    os.path.join(SAVE_DIR, "Save_3.txt"),
+]
+if not os.path.exists(SAVE_DIR):
+    os.makedirs(SAVE_DIR)
+
+save_screen_active = False
+load_screen_active = False
+selected_slot = 0
+save_btn_rect = None
+load_btn_rect = None
+slot_rects = []
 
 # CONSTANTS
 ROOM_WIDTH = 800
@@ -12,14 +29,14 @@ LEVELS = 3
 MAX_UPGRADE_LEVEL = 5
 
 # Basic set upt
-pygame.display.set_caption("Crownfall")
+pygame.display.set_caption("CROWNFALL")
 screen = pygame.display.set_mode((ROOM_WIDTH, ROOM_HEIGHT))
 clock = pygame.time.Clock()
 font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 20)
 title_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 80)
 
 # Player and Room setup
-player = pygame.Rect(50, ROOM_HEIGHT - 100, 50, 50)
+player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
 facing = "up"
 current_room = [0, 0, 0]
 current_level = current_room[0]
@@ -65,7 +82,7 @@ trading_prompt_active = False # Trade prompt not showing
 trade_menu_active = False # Trade menu closed
 upgrade_menu_active = False # Uograde menu closed
 instructions_active = False # Instructions screen flag
-loading_screen_active = False # Loading screen flag
+lore_screen_active = False # lore screen flag
 combat_active = False # Combat flag
 player_turn_done = False # Player has acted this turn
 enemy_turn_pending = False # Enemy is waiting to take its turn
@@ -257,7 +274,7 @@ for direction in player_images:
         img = pygame.image.load(
             f"crownfall_images/{direction.capitalize()}/{direction.capitalize()}_{i}.png"
         ).convert_alpha()
-        img = pygame.transform.scale(img, (50, 50))
+        img = pygame.transform.scale(img, (80, 80))
         player_images[direction].append(img)
 
 # DRAWING ELEMENTS
@@ -1307,11 +1324,11 @@ def draw_instructions(surface):
         "Toggle Map:  M",
         "Interact / Talk:  Right-Click",
         "Close Menus: ESC",
-        "Back to Home: Right ALT"
-        " ",
-        "Collect resources by walking over them.",
-        "Open SHOP use UP/DOWN to select",
-        "Open UPGRADES use LEFT/RIGHT to select"
+        "Back to Home: Hold CRTL + 9",
+        "Wipe Saves: HolD CTRL + 0",
+        "Save Progress: Hold CTRL + S",
+        "Load Progress: Hold CTRL + L",
+        ""
     ]
 
     # Draw each line
@@ -1324,9 +1341,9 @@ def draw_instructions(surface):
     hint = font.render("Press ESC to return", True, (180, 180, 180))
     surface.blit(hint, hint.get_rect(center=(x + w//2, y + h - 36)))
 
-# DRAWING LOADING SCREEN
-def draw_loading_screen(surface):
-    """Loading screen with lore + waits for SPACE to continue."""
+# DRAWING Loading SCREEN
+def draw_lore_screen(surface):
+    """lore screen with lore + waits for SPACE to continue."""
 
     draw_overlay(surface)
 
@@ -1833,6 +1850,70 @@ def draw_dialogue(surface):
         surface.blit(t_surf, (box_x + 20, y))
         y += font.get_height() + 5
 
+# DRAWING SAVE SCREEN
+def draw_save_screen(surface):
+    global save_btn_rect, slot_rects
+
+    draw_overlay(surface)
+    slot_rects = []
+
+    title = title_font.render("SAVE GAME", True, (255, 255, 255))
+    surface.blit(title, title.get_rect(center=(ROOM_WIDTH//2, 100)))
+
+    for i in range(3):
+        x = ROOM_WIDTH//2 + (i - 1) * 220
+        y = ROOM_HEIGHT//2
+
+        rect = pygame.Rect(x - 80, y - 60, 160, 120)
+        slot_rects.append(rect)
+
+        color = (200, 200, 50) if i == selected_slot else (50, 50, 50)
+        pygame.draw.rect(surface, color, rect)
+        pygame.draw.rect(surface, (255,255,255), rect, 3)
+
+        label = f"SLOT {i+1}"
+        status = "EMPTY" if slot_is_empty(i) else "OVERWRITE"
+
+        surface.blit(font.render(label, True, (0,0,0)), (rect.x+30, rect.y+20))
+        surface.blit(font.render(status, True, (0,0,0)), (rect.x+25, rect.y+60))
+
+    save_btn_rect = pygame.Rect(ROOM_WIDTH//2 - 100, ROOM_HEIGHT - 120, 200, 60)
+    pygame.draw.rect(surface, (0,150,0), save_btn_rect)
+    pygame.draw.rect(surface, (255,255,255), save_btn_rect, 2)
+    surface.blit(font.render("SAVE", True, (255,255,255)), save_btn_rect.move(70,15))
+
+# DRAWING LOAD SCREEN
+def draw_load_screen(surface):
+    global load_btn_rect, slot_rects
+
+    draw_overlay(surface)
+    slot_rects = []
+
+    title = title_font.render("LOAD GAME", True, (255, 255, 255))
+    surface.blit(title, title.get_rect(center=(ROOM_WIDTH//2, 100)))
+
+    for i in range(3):
+        x = ROOM_WIDTH//2 + (i - 1) * 220
+        y = ROOM_HEIGHT//2
+
+        rect = pygame.Rect(x - 80, y - 60, 160, 120)
+        slot_rects.append(rect)
+
+        color = (200, 200, 50) if i == selected_slot else (50, 50, 50)
+        pygame.draw.rect(surface, color, rect)
+        pygame.draw.rect(surface, (255,255,255), rect, 3)
+
+        label = f"SLOT {i+1}"
+        status = "EMPTY" if slot_is_empty(i) else "LOAD"
+
+        surface.blit(font.render(label, True, (0,0,0)), (rect.x+30, rect.y+20))
+        surface.blit(font.render(status, True, (0,0,0)), (rect.x+40, rect.y+60))
+
+    load_btn_rect = pygame.Rect(ROOM_WIDTH//2 - 100, ROOM_HEIGHT - 120, 200, 60)
+    pygame.draw.rect(surface, (0,100,200), load_btn_rect)
+    pygame.draw.rect(surface, (255,255,255), load_btn_rect, 2)
+    surface.blit(font.render("LOAD", True, (255,255,255)), load_btn_rect.move(70,15))
+
 # COLLISION
 def colllision_check(dx, dy, coll_list):
     """Moves the player while preventing overlap with collidable objects."""
@@ -2003,13 +2084,13 @@ def shards_required_for_level(level_index):
     """Returns the number of Enemy Shards required to unlock the boss fight for the given level index."""
     return 30 + level_index * 60
 
-#Reseying the game state
+#Resetting the game state
 def reset_game():
     """Resets all game state variables to their initial values for a new game."""
     global health, max_health, inventory, player, current_room, player_dead
     global visited_rooms, minimap_memory, combat_active
     global trade_menu_active, trading_prompt_active, dialogue_active
-    global loading_screen_active, instructions_active, hud_visible, map_visible, speed_potion_duration
+    global lore_screen_active, instructions_active, hud_visible, map_visible, speed_potion_duration
     global boss_phase, current_level, arrmor_upgrade_level, weapon_upgrade_level
     global inventory_level, gold_pickup_level
 
@@ -2032,22 +2113,153 @@ def reset_game():
     trade_menu_active = False
     trading_prompt_active = False
     dialogue_active = False
-    loading_screen_active = False
+    lore_screen_active = False
     instructions_active = False
     hud_visible = False
     map_visible = False
     speed_potion_duration = 0
     boss_phase[current_room[0]] = 1
 
+# Check if slot is empty
+def slot_is_empty(slot_index):
+    return not os.path.exists(SAVE_FILES[slot_index]) or os.path.getsize(SAVE_FILES[slot_index]) == 0
+
+# Saving Game
+def save_game(slot):
+    """ Writing to the file and saveing the game"""
+    # Finding the current file selected
+    path = SAVE_FILES[slot]
+
+    # Data getting saved
+    data = {
+        # Player
+        "player_pos": [player.x, player.y],
+        "current_room": current_room,
+        "previous_room": previous_room,
+
+        # Health & stats
+        "health": health,
+        "max_health": max_health,
+
+        # Inventory
+        "inventory": inventory,
+        "inventory_limits": inventory_limits,
+
+        # Upgrades
+        "armor_level": armor_level,
+        "weapon_level": weapon_level,
+        "inventory_level": inventory_level,
+        "gold_pickup_level": gold_pickup_level,
+        "weapon_base_multiplier": weapon_base_multiplier,
+        "gold_per_pickup": gold_per_pickup,
+
+        # Effects
+        "speed_potion_duration": speed_potion_duration,
+        "strength_active": strength_active,
+
+        # World state
+        "visited_rooms": list(visited_rooms),
+        "minimap_memory": { f"{k[0]},{k[1]}": v for k, v in minimap_memory.items() },
+
+        # Collectibles
+        "c_Artifacts": list(c_Artifacts),
+        "c_Gold": list(c_Gold),
+        "c_Health_Potions": list(c_Health_Potions),
+        "c_Speed_Potions": list(c_Speed_Potions),
+        "c_Strength_Potions": list(c_Strength_Potions),
+
+        # Enemies & bosses
+        "dead_enemies": list(dead_enemies),
+        "boss_defeated": boss_defeated,
+        "boss_phase": boss_phase,
+        "level_passed": level_passed
+    }
+
+    # Writing to the file to save
+    with open(path, "w") as f:
+        # .dump overwrites the file
+        json.dump(data, f)
+
+# Loading Game
+def load_game(slot):
+    """Reading the file and loading the game data"""
+    global health, max_health
+    global armor_level, weapon_level, inventory_level, gold_pickup_level
+    global weapon_base_multiplier, gold_per_pickup
+    global speed_potion_duration, strength_active
+    global previous_room
+
+    # Current selected file
+    path = SAVE_FILES[slot]
+    if not os.path.exists(path):
+        return
+
+    # Open the file and read it
+    with open(path, "r") as f:
+        data = json.load(f)
+
+    # Set the game data to the save game data
+    # Player
+    player.x, player.y = data["player_pos"]
+    current_room[:] = data["current_room"]
+    previous_room = data["previous_room"]
+
+    # Health & stats
+    health = data["health"]
+    max_health = data["max_health"]
+
+    # Inventory
+    inventory.clear()
+    inventory.update(data["inventory"])
+    inventory_limits.clear()
+    inventory_limits.update(data["inventory_limits"])
+
+    # Upgrades
+    armor_level = data["armor_level"]
+    weapon_level = data["weapon_level"]
+    inventory_level = data["inventory_level"]
+    gold_pickup_level = data["gold_pickup_level"]
+    weapon_base_multiplier = data["weapon_base_multiplier"]
+    gold_per_pickup = data["gold_per_pickup"]
+
+    # Effects
+    speed_potion_duration = data["speed_potion_duration"]
+    strength_active = data["strength_active"]
+
+    # World state
+    visited_rooms.clear()
+    visited_rooms.update(tuple(r) for r in data["visited_rooms"])
+    minimap_memory.clear()
+    for k, v in data["minimap_memory"].items():
+        x, y = map(int, k.split(","))
+        minimap_memory[(x, y)] = v
+
+    # Collectibles
+    c_Artifacts.clear()
+    c_Artifacts.update(tuple(v) for v in data["c_Artifacts"])
+    c_Gold.clear()
+    c_Gold.update(tuple(v) for v in data["c_Gold"])
+    c_Health_Potions.clear()
+    c_Health_Potions.update(tuple(v) for v in data["c_Health_Potions"])
+    c_Speed_Potions.clear()
+    c_Speed_Potions.update(tuple(v) for v in data["c_Speed_Potions"])
+    c_Strength_Potions.clear()
+    c_Strength_Potions.update(tuple(v) for v in data["c_Strength_Potions"])
+
+    # Enemies & bosses
+    dead_enemies.clear()
+    dead_enemies.update(tuple(v) for v in data["dead_enemies"])
+    boss_defeated[:] = data["boss_defeated"]
+    boss_phase[:] = data["boss_phase"]
+    level_passed[:] = data["level_passed"]
+
 # MAIN LOOP
 running = True
 while running:
     dt = clock.tick(60)
     keys = pygame.key.get_pressed()
-
     # ---------- EVENT HANDLING ----------
     for event in pygame.event.get():
-
         # --- INSTA-KILL BUTTON (K) ---
         if combat_active and event.type == pygame.KEYDOWN and event.key == pygame.K_k:
             # Instantly kill the enemy
@@ -2072,17 +2284,14 @@ while running:
             # Award shards OR handle boss phases
             if r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1:  
                 # --- BOSS ROOM ---
-
                 # If boss still has another phase
                 if boss_phase[lvl_idx] < boss_max_phases:
                     boss_phase[lvl_idx] += 1
                     feedback, feedback_timer = (f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0)
-
                     # Restore boss HP for new phase
                     new_hp = 300 + lvl_idx * 100
                     enemy_health[current_enemy_index] = new_hp
                     enemy_max_health[current_enemy_index] = new_hp
-
                     # Reset combat state for new phase
                     player_turn_done = False
                     combat_active = True
@@ -2091,7 +2300,6 @@ while running:
                 # -------- FINAL PHASE DEFEATED --------
                 boss_defeated[lvl_idx] = True
                 dead_enemies.add((*current_room, ax, ay))
-
                 # Remove boss from all enemy lists
                 enemy_health.pop(current_enemy_index)
                 enemy_max_health.pop(current_enemy_index)
@@ -2104,7 +2312,6 @@ while running:
                 # --- NORMAL ENEMY ---
                 inventory["Enemy Shards"] = inventory.get("Enemy Shards", 0) + 10
                 dead_enemies.add((*current_room, ax, ay))
-
                 # Remove enemy normally
                 enemy_health.pop(current_enemy_index)
                 enemy_max_health.pop(current_enemy_index)
@@ -2113,34 +2320,51 @@ while running:
                 enemy_spawn_points.pop(current_enemy_index)
                 continue
 
+        # --- DELETE ALL SAVES ---
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_0 and pygame.key.get_mods() & pygame.KMOD_CTRL:
+            for path in SAVE_FILES:
+                if os.path.exists(path):
+                    open(path, "w").close()  # wipe contents
+
+        # --- QUIT EVENT ---
         if event.type == pygame.QUIT:
             running = False
             break
 
+        # --- HOME SCREEN EVENT HANDLING ---
         if on_home and event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
             on_home = False
-            loading_screen_active = True
+            lore_screen_active = True
             continue
-        
-        if not on_home and event.type == pygame.KEYDOWN and event.key == pygame.K_RALT:
+
+        # --- GO TO HOME SCREEN FROM GAME ---
+        if not on_home and event.type == pygame.KEYDOWN and event.key == pygame.K_9 and pygame.key.get_mods() & pygame.KMOD_CTRL:
             on_home = True
-            loading_screen_active = False
+            lore_screen_active = False
             instructions_active = False
             continue
-        
+
+        # --- GO TO LOADING SCREEN FROM GAME ---
+        if not on_home and event.type == pygame.KEYDOWN and event.key == pygame.K_l and pygame.key.get_mods() & pygame.KMOD_CTRL:
+            load_screen_active = True
+            on_home = False
+            continue
+
+        # --- EXIT INSTRUCTIONS SCREEN ---
         if instructions_active and event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             instructions_active = False
             on_home = True
             continue
 
-        # LOADING SCREEN EVENT HANDLING
-        if loading_screen_active:
+        # --- LORE SCREEN EVENT HANDLING ---
+        if lore_screen_active:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                loading_screen_active = False
+                lore_screen_active = False
                 on_home = False
                 player.x, player.y = 50, ROOM_HEIGHT - 100
             continue
 
+        # --- CAMPFIRE HEALING ---
         if campfire_tiles and player.colliderect(campfire_tiles[0].inflate(60, 60)):
             healing_at_campfire = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_h:
@@ -2153,8 +2377,38 @@ while running:
                         message, message_timer, message_color = "Health fully restored!", 1.0, (0, 255, 0)
                         healing_at_campfire = False
                     else:
-                        message, message_timer, message_color = f"Healing... Health {int(health)}", 0.5, (0, 255, 0)
+                        message, message_timer, message_color = f"Healing... Health: {int(health)}", 0.5, (0, 255, 0)
                     continue
+
+        # --- SAVE/LOAD SCREEN NAVIGATION ---
+        if save_screen_active or load_screen_active:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    selected_slot = (selected_slot - 1) % 3
+                elif event.key == pygame.K_RIGHT:
+                    selected_slot = (selected_slot + 1) % 3
+                elif event.key == pygame.K_ESCAPE:
+                    on_home = True
+                    save_screen_active = False
+                    load_screen_active = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                # Click slot
+                for i, rect in enumerate(slot_rects):
+                    if rect.collidepoint(event.pos):
+                        selected_slot = i
+
+                # Click SAVE
+                if save_screen_active and save_btn_rect and save_btn_rect.collidepoint(event.pos):
+                    save_game(selected_slot)
+                    save_screen_active = False
+
+                # Click LOAD
+                if load_screen_active and load_btn_rect and load_btn_rect.collidepoint(event.pos):
+                    if not slot_is_empty(selected_slot):
+                        load_game(selected_slot)
+                        load_screen_active = False
+            continue
 
         # ----- Mouse interactions -----
         if event.type == pygame.MOUSEBUTTONDOWN and not on_home:
@@ -2237,8 +2491,22 @@ while running:
                         break
                 continue
 
-            # Handle left click for upgrade button when upgrade menu is 
+            # Handle left click for load and save buttons when load and save menus
             if event.button == 1:
+                # SAVE CONFIRM
+                if save_screen_active and save_btn_rect.collidepoint(event.pos):
+                    save_game(selected_slot)
+                    save_screen_active = False
+
+                # LOAD CONFIRM
+                if load_screen_active and load_btn_rect.collidepoint(event.pos):
+                    if not slot_is_empty(selected_slot):
+                        load_game(selected_slot)
+                        load_screen_active = False
+                        on_home = False
+                        player_dead = False
+                        hud_visible = True
+
                 # ---------- PLAYER CLICK IN TRADE MENU ----------
                 if trade_menu_active:
                     # Remake the trade menu button rect exactly as in draw_trade_menu
@@ -2295,7 +2563,6 @@ while running:
                 
                 # ---------- PLAYER CLICK IN COMBAT ----------
                 if combat_active and not enemy_turn_pending:
-
                     for rect, name in combat_buttons:
                         if rect.collidepoint(event.pos):
                             # Track heals used
@@ -2508,6 +2775,7 @@ while running:
                             enemy_turn_delay = enemy_delay_frames
                             break
 
+                # Handles the upgrade button in the upgrade menu
                 if upgrade_menu_active:
                     # Remake the upgrade menu button rect exactly as in draw_upgrade_menu
                     box_w, box_h = 700, 520
@@ -2539,6 +2807,10 @@ while running:
 
         # ----- Toggles & Keyboard -----
         elif event.type == pygame.KEYDOWN and not on_home:
+            if event.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_CTRL:
+                if not combat_active and not player_dead and not on_home:
+                    save_screen_active = True
+                    load_screen_active = False
             # No controls when combat is on
             if combat_active:
                 break
@@ -2674,7 +2946,7 @@ while running:
         hx = ROOM_WIDTH // 2
         hy = ROOM_HEIGHT // 2
 
-        halo_radius = 150
+        halo_radius = 180
         halo_thickness = 10
 
         t = pygame.time.get_ticks() * 0.003
@@ -2703,17 +2975,17 @@ while running:
         option_color = (180, 210, 255)
         option_shadow = (70, 90, 130)
 
-        options = ["Play", "Controls", "Quit"]
+        options = ["PLAY", "CONTROLS", "LOAD GAME", "QUIT"]
         option_rects = []
         start_y = ROOM_HEIGHT // 2 - 80
 
         for i, opt in enumerate(options):
             shadow = menu_font.render(opt, True, option_shadow)
-            shadow_rect = shadow.get_rect(center=(ROOM_WIDTH // 2 + 2, start_y + i * 70 + 2))
+            shadow_rect = shadow.get_rect(center=(ROOM_WIDTH // 2 + 2, start_y + i * 70 - 20))
             screen.blit(shadow, shadow_rect)
 
             surf = menu_font.render(opt, True, option_color)
-            rect = surf.get_rect(center=(ROOM_WIDTH // 2, start_y + i * 70))
+            rect = surf.get_rect(center=(ROOM_WIDTH // 2, start_y + i * 70 - 25))
             screen.blit(surf, rect)
             option_rects.append(rect)
 
@@ -2731,28 +3003,33 @@ while running:
             # Play
             if option_rects[0].collidepoint(pos):
                 on_home = False
-                loading_screen_active = True
+                lore_screen_active = True
 
             # How to Play
             elif option_rects[1].collidepoint(pos):
                 on_home = False
                 instructions_active = True
 
-            # Quit
+            # Load
             elif option_rects[2].collidepoint(pos):
+                on_home = False
+                load_screen_active = True
+                save_screen_active = False
+
+            # Quit
+            elif option_rects[3].collidepoint(pos):
                 running = False
         pygame.display.flip()
         continue
-
 
     if instructions_active:
         draw_instructions(screen)
         pygame.display.flip()
         continue
 
-    if loading_screen_active:
+    if lore_screen_active:
         screen.fill((0,0,0))
-        draw_loading_screen(screen)
+        draw_lore_screen(screen)
         pygame.display.flip()
         continue
 
@@ -2776,8 +3053,7 @@ while running:
             continue
 
         if death_load_btn.collidepoint(event.pos):
-            print("Load")
-            # (later you load save data here)
+            on_home = False
             continue
 
     if player_dead:
@@ -2790,7 +3066,6 @@ while running:
         pygame.display.flip()
 
         if event.type == pygame.MOUSEBUTTONDOWN:
-            
             # Go to Home Screen
             if end_home_btn.collidepoint(event.pos):
                 reset_game()
@@ -2802,7 +3077,16 @@ while running:
             if end_return_btn.collidepoint(event.pos):
                 end_screen_active = False
                 continue
+        continue
 
+    if save_screen_active:
+        draw_save_screen(screen)
+        pygame.display.flip()
+        continue
+
+    if load_screen_active:
+        draw_load_screen(screen)
+        pygame.display.flip()
         continue
 
     # ---------- GAMEPLAY ----------
@@ -2953,5 +3237,4 @@ while running:
         if feedback_timer == 0:
             feedback = ""
     pygame.display.flip()
-
 pygame.quit()
