@@ -97,6 +97,7 @@ trade_pending_key = None # Marks villager to show trade prompt after dialogue
 active_villager_index = None # Which villager for multiple in a room
 current_enemy_index = None # Which enemy for multiple in a room
 previous_room = None # Tracks last room for enemy respawn logic
+enemy_last_action = None # Tracks last action by enemy to not repeat
 
 # Armor and Weapons set up
 armor_level = 2  # Player's armor upgrade level (increases max health)
@@ -255,7 +256,7 @@ level_passed = [False, False]
 
 # Health set up
 max_health = 100 + armor_level * 100
-health = max_health - 50
+health = max_health - 50 - 200
 
 # ─── PLAYER ANIMATIONS ───
 last_facing = "up"
@@ -319,6 +320,9 @@ def draw_objects(x, y, obj_type, surface):
             return w, h
 
     # environment objects
+    if obj_type == "castle_floor":
+        rect = load_img("Castle_floor_bg", 800, 800)
+        return rect
     if obj_type == "tree1":
         rect = load_img("Tree_1", 200, 250)
         colliders.append(rect)
@@ -643,6 +647,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Middle Left
     elif level == 1 and row == 1 and col == 0:
+        draw_objects(780, -625, "castle_floor", surface) # Castle floor
         for x in [700,600]:
             draw_objects(x, 300, "path", surface) # Path
         draw_objects(400, 100, "upgrade_hut", surface) # Upgrade
@@ -659,6 +664,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Middle
     elif level == 1 and row == 1 and col == 1:
+        draw_objects(0, -625, "castle_floor", surface) # Castle floor
         for y in [700,600,500,400,300,200]:
             draw_objects(500, y, "path", surface) # Path
         for x in [0,100,200,300,400]:
@@ -674,6 +680,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Middle Right
     elif level == 1 and row == 1 and col == 2:
+        draw_objects(0, -625, "castle_floor", surface) # Castle floor
         for x in [-100,0,200,400,600]:
             draw_objects(x, 0, "wall1", surface) # Wall 1
         draw_objects(100, 350, "tree1", surface) # Tree 1
@@ -683,7 +690,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Top Left
     elif level == 1 and row == 2 and col == 0:
-        for y in [-200,0,200,400]:
+        draw_objects(750, 0, "castle_floor", surface) # Castle floor
+        for y in [-200,0,200,400, 600]:
             draw_objects(600, y, "wall2", surface) # Wall 2
         if can_draw(200, 400, dead_enemies):
             draw_objects(200, 400, "enemy", surface) # Enemy
@@ -696,6 +704,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Top Middle
     elif level == 1 and row == 2 and col == 1:
+        draw_objects(0, 0, "castle_floor", surface) # Castle floor
         if can_draw(600, 150, dead_enemies):
             draw_objects(600, 150, "enemy", surface) # Enemy
         if can_draw(300, 250, c_Health_Potions):
@@ -711,6 +720,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
 
     # Level 2: Top Right
     elif level == 1 and row == 2 and col == 2:
+        draw_objects(0, 0, "castle_floor", surface) # Castle floor
         if can_draw(50, 100, c_Health_Potions):
             draw_objects(50, 100, "health_potion", surface) # Health Potion
         for x in [300, 301, 302, 303, 304, 305, 306]:
@@ -1535,88 +1545,112 @@ def draw_combat_screen(surface):
 
 # ENEMY TURN AI
 def run_enemy_turn():
-    """Runs the enemy's turn in combat, choosing an action based on current health and state."""
-    global health, enemy_turn_pending, player_defending, enemy_defending, enemy_heals_used, player_dead, combat_active, feedback, feedback_timer
+    """Smarter enemy AI with action memory and contextual behavior."""
+    global health, enemy_turn_pending, player_defending, enemy_defending
+    global enemy_heals_used, player_dead, combat_active, feedback, feedback_timer
+    global enemy_last_action
 
     enemy_hp = enemy_health[current_enemy_index]
     enemy_max = enemy_max_health[current_enemy_index]
 
-    # Enemy decision
+    # --- Context checks ---
     low_hp = enemy_hp < enemy_max * 0.35
-    weights = []
 
-    # Heal option if under 5 heals used and not at full health and missing at least 20 HP
-    if enemy_heals_used < 5 and enemy_hp < enemy_max and (enemy_max - enemy_hp) >= 20:
-        heal_weight = 50 if low_hp else 10
-        weights.append(("heal", heal_weight))
+    lvl_idx, r_idx, c_idx = current_room
+    is_boss = (r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1)
+    boss_phase_num = boss_phase[lvl_idx] if is_boss else None
 
-    if enemy_defending:
-        defend_weight = 10 if low_hp else 5
-        weights.append(("defend", defend_weight))
+    # --- Base weights ---
+    weights = {
+        "attack": 40,
+        "defend": 25,
+        "heal": 20
+    }
+
+    # --- Player defending → enemy less likely to defend ---
+    if player_defending:
+        weights["defend"] -= 15
+        weights["attack"] += 10
+
+    # --- Avoid repeating last action ---
+    if enemy_last_action:
+        weights[enemy_last_action] *= 0.3
+
+    # --- Healing rules ---
+    can_heal = (
+        enemy_heals_used < 5
+        and enemy_hp < enemy_max
+        and (enemy_max - enemy_hp) >= 20
+    )
+
+    if not can_heal:
+        weights["heal"] = 0
+
+    # --- Rule 3: Boss Phase 1 behavior ---
+    if is_boss and boss_phase_num == 1:
+        weights["heal"] = 0 # no healing
+        weights["attack"] += 20 # aggressive
+        weights["defend"] -= 10
+
+    # --- Low HP behavior ---
+    if low_hp:
+        weights["defend"] += 10
+        if can_heal:
+            weights["heal"] += 15
+
+    # --- Clamp weights ---
+    for k in weights:
+        weights[k] = max(0, int(weights[k]))
+
+    # --- Weighted choice ---
+    actions = []
+    for action, weight in weights.items():
+        actions.extend([action] * weight)
+
+    if not actions:
+        enemy_choice = "attack"
     else:
-        defend_weight = 40 if low_hp else 20
-        weights.append(("defend", defend_weight))
+        enemy_choice = random.choice(actions)
 
-    attack_weight = 40
-    weights.append(("attack", attack_weight))
+    enemy_last_action = enemy_choice
 
-    total = sum(w for _, w in weights)
-    r = random.randint(1, total)
-    cur = 0
-    for action, w in weights:
-        cur += w
-        if r <= cur:
-            enemy_choice = action
-            break
+    # EXECUTE ACTION
 
-    # Execute enemy action
     if enemy_choice == "attack":
-        # Determine if the current enemy is a boss
-        lvl_idx = current_room[0]
-        r_idx = current_room[1]
-        c_idx = current_room[2]
-
-        is_boss = (r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1)
-
-        # Bosses do more damage depending on phase
+        # Damage
         if is_boss:
-            phase = boss_phase[lvl_idx]
-
-            if phase == 1:
-                dmg = random.randint(15, 20) # Phase 1 damage
-            elif phase == 2:
-                dmg = random.randint(20, 25) # Phase 2 damage
+            if boss_phase_num == 1:
+                dmg = random.randint(15, 20)
+            elif boss_phase_num == 2:
+                dmg = random.randint(20, 25)
             else:
-                dmg = random.randint(15, 20) # fallback
+                dmg = random.randint(15, 20)
         else:
-            dmg = random.randint(8, 15) # Normal enemy damage
+            dmg = random.randint(8, 15)
 
         if player_defending:
-            roll = random.random()  # 0.0 → 1.0
+            roll = random.random()
             if roll < 0.25:
-                # 25% full hit
                 final_dmg = dmg
-                feedback, feedback_timer = f"Enemy hits you for {final_dmg} damage!", 2.0
-            elif roll < 0.75 and roll >= 0.25:
-                # 50% half damage
+                feedback = f"Enemy hits you for {final_dmg} damage!"
+            elif roll < 0.75:
                 final_dmg = dmg // 2
-                feedback, feedback_timer = f"Enemy partially hits you for {final_dmg} damage!", 2.0
+                feedback = f"Enemy partially hits you for {final_dmg} damage!"
             else:
-                # 25% miss
                 final_dmg = 0
-                feedback, feedback_timer = "Enemy attack MISSES!", 2.0
+                feedback = "Enemy attack MISSES!"
         else:
-            # normal attack
             final_dmg = dmg
-            feedback, feedback_timer = f"Enemy hits you for {final_dmg} damage!", 2.0
+            feedback = f"Enemy hits you for {final_dmg} damage!"
 
-        health -= final_dmg
-        health = max(0, health)  # keep health from going below 0
+        health = max(0, health - final_dmg)
+        feedback_timer = 2.0
         player_defending = False
+
         if health == 0:
             combat_active = False
             player_dead = True
-            boss_phase[current_room[0]] = 1  # reset boss phase on death
+            boss_phase[lvl_idx] = 1
 
     elif enemy_choice == "defend":
         enemy_defending = True
@@ -1628,7 +1662,6 @@ def run_enemy_turn():
         enemy_heals_used += 1
         feedback, feedback_timer = f"Enemy heals for {heal_amount} HP!", 2.0
 
-    # Reset turn to people
     enemy_turn_pending = False
 
 # DRAWING DEATH SCREEN
@@ -3053,7 +3086,9 @@ while running:
             continue
 
         if death_load_btn.collidepoint(event.pos):
+            load_screen_active = True
             on_home = False
+            player_dead = False
             continue
 
     if player_dead:
