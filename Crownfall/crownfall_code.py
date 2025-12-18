@@ -256,7 +256,34 @@ level_passed = [False, False]
 
 # Health set up
 max_health = 100 + armor_level * 100
-health = max_health - 50 - 200
+health = max_health
+
+# Boss dialogue setup
+# Key = (level, boss_type)
+boss_dialogues = {
+    (0, "illager"): [
+        "Illager: Another fool wanders into my road.",
+        "Illager: I've crushed merchants, guards… heroes too.",
+        "You: Then you won't mind one more challenger.",
+        "Illager: Draw your blade."
+    ],
+
+    (1, "king"): [
+        "King: Kneel.",
+        "King: I rule by strength, not mercy.",
+        "You: Your crown was stolen. I'm taking it back.",
+        "King: Try and die where you stand."
+    ],
+
+    (2, "chief"): [
+        "Chief: I smell fear.",
+        "Chief: This land breaks warriors stronger than you.",
+        "You: I didn't come to turn back.",
+        "Chief: Die"
+    ]
+}
+boss_dialogue_played = [False] * LEVELS
+current_boss_dialogue = []
 
 # ─── PLAYER ANIMATIONS ───
 last_facing = "up"
@@ -1442,7 +1469,6 @@ def draw_combat_screen(surface):
     e_hp_text = font.render(f"{int(e_cur)}/{e_max}", True, (255,255,255))
     surface.blit(e_hp_text, (ex + e_bar_w//2 - e_hp_text.get_width()//2, ey + e_bar_h + 5))
 
-
     # Loads the enemy in the battle
     l, r, c = current_room
     if l == 0 and r == 2 and c == 2:
@@ -1458,8 +1484,7 @@ def draw_combat_screen(surface):
         surface.blit(scaled_image, (100, 225))
     else:
         image = pygame.image.load("crownfall_images/Enemy.png").convert_alpha()
-        scaled_image = pygame.transform.scale(image, (500, 282))
-        surface.blit(scaled_image, (20, 250))
+        surface.blit(image, (80, 275))
 
     # Six buttons
     btn_names = ["Health Potion", "Strength Potion", "Special Attack", "Attack", "Defend", "Run"]
@@ -1682,6 +1707,18 @@ def run_enemy_turn():
         feedback, feedback_timer = f"Enemy heals for {heal_amount} HP!", 2.0
 
     enemy_turn_pending = False
+
+# Boss Dialogue
+def start_boss_dialogue(level, boss_type):
+    global dialogue_active, current_dialogue, dialogue_index, current_boss_dialogue
+
+    current_boss_dialogue = boss_dialogues.get((level, boss_type), [])
+    if not current_boss_dialogue:
+        return
+
+    current_dialogue = current_boss_dialogue
+    dialogue_index = 0
+    dialogue_active = True
 
 # DRAWING DEATH SCREEN
 def draw_death_screen(surface):
@@ -2136,22 +2173,22 @@ def shards_required_for_level(level_index):
     """Returns the number of Enemy Shards required to unlock the boss fight for the given level index."""
     return 30 + level_index * 60
 
-#Resetting the game state
+# Resetting the game state
 def reset_game():
     """Resets all game state variables to their initial values for a new game."""
     global health, max_health, inventory, player, current_room, player_dead
     global visited_rooms, minimap_memory, combat_active
     global trade_menu_active, trading_prompt_active, dialogue_active
     global lore_screen_active, instructions_active, hud_visible, map_visible, speed_potion_duration
-    global boss_phase, current_level, arrmor_upgrade_level, weapon_upgrade_level
+    global boss_phase, current_level, armor_level, weapon_level
     global inventory_level, gold_pickup_level
 
     health = 100
     max_health = 100
     player.x, player.y = 50, ROOM_HEIGHT - 100
     current_room[:] = [0, 0, 0]
-    arrmor_upgrade_level = 0
-    weapon_upgrade_level = 0
+    armor_level = 0
+    weapon_level = 0
     inventory_level = 0
     gold_pickup_level = 0
 
@@ -2224,7 +2261,7 @@ def save_game(slot):
         "dead_enemies": list(dead_enemies),
         "boss_defeated": boss_defeated,
         "boss_phase": boss_phase,
-        "level_passed": level_passed
+        "level_passed": level_passed,
     }
 
     # Writing to the file to save
@@ -2239,7 +2276,7 @@ def load_game(slot):
     global armor_level, weapon_level, inventory_level, gold_pickup_level
     global weapon_base_multiplier, gold_per_pickup
     global speed_potion_duration, strength_active
-    global previous_room
+    global previous_room, boss_dialogue_played
 
     # Current selected file
     path = SAVE_FILES[slot]
@@ -2304,6 +2341,7 @@ def load_game(slot):
     boss_defeated[:] = data["boss_defeated"]
     boss_phase[:] = data["boss_phase"]
     level_passed[:] = data["level_passed"]
+    boss_dialogue_played = [False] * LEVELS
 
 # MAIN LOOP
 running = True
@@ -2351,6 +2389,8 @@ while running:
 
                 # -------- FINAL PHASE DEFEATED --------
                 boss_defeated[lvl_idx] = True
+                if all(boss_defeated):
+                    end_screen_active = True
                 dead_enemies.add((*current_room, ax, ay))
                 # Remove boss from all enemy lists
                 enemy_health.pop(current_enemy_index)
@@ -2464,8 +2504,47 @@ while running:
 
         # ----- Mouse interactions -----
         if event.type == pygame.MOUSEBUTTONDOWN and not on_home:
-            # ---Villager interactions---
             if event.button == 3:
+                # ───── BOSS DIALOGUE ADVANCE ─────
+                if dialogue_active:
+                    dialogue_index += 1
+
+                    # If dialogue finished, wait for next click to start combat
+                    if dialogue_index >= len(current_dialogue):
+                        dialogue_active = False
+                        dialogue_index = 0
+                    continue
+
+                # ───── START BOSS DIALOGUE ─────
+                if not combat_active and not dialogue_active:
+                    for rect in enemy_tiles:
+                        if rect.collidepoint(pygame.mouse.get_pos()):
+                            level = current_room[0]
+
+                            # Determine boss type by max health
+                            idx = enemy_rects.index(rect)
+                            hp = enemy_max_health[idx]
+
+                            if hp == 150:
+                                boss_type = "illager"
+                            elif hp == 200:
+                                boss_type = "king"
+                            elif hp == 250:
+                                boss_type = "chief"
+                            else:
+                                continue
+
+                            # Only play once per level
+                            if not boss_dialogue_played[level]:
+                                boss_dialogue_played[level] = True
+                                start_boss_dialogue(level, boss_type)
+                                continue
+
+                            # Dialogue already played → start combat
+                            combat_active = True
+                            current_enemy_index = idx
+                            continue
+
             # If right-click and dialogue active -> advance dialogue 
                 if trading_prompt_active or trade_menu_active:
                     continue
@@ -2683,6 +2762,8 @@ while running:
                                             combat_active = False
                                             strength_active = False
                                             boss_defeated[lvl_idx] = True
+                                            if all(boss_defeated):
+                                                on_end_screen = True
                                             dead_enemies.add((*current_room, ax, ay))
                                     else:
                                         strength_active = False
@@ -2762,6 +2843,8 @@ while running:
                                             strength_active = False
                                             combat_active = False
                                             boss_defeated[lvl_idx] = True
+                                            if all(boss_defeated):
+                                                on_end_screen = True
                                             dead_enemies.add((*current_room, ax, ay))
                                     else:
                                         strength_active = False
@@ -3292,4 +3375,3 @@ while running:
             feedback = ""
     pygame.display.flip()
 pygame.quit()
-
