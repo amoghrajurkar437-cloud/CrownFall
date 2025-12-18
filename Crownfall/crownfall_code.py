@@ -1442,6 +1442,25 @@ def draw_combat_screen(surface):
     e_hp_text = font.render(f"{int(e_cur)}/{e_max}", True, (255,255,255))
     surface.blit(e_hp_text, (ex + e_bar_w//2 - e_hp_text.get_width()//2, ey + e_bar_h + 5))
 
+
+    # Loads the enemy in the battle
+    l, r, c = current_room
+    if l == 0 and r == 2 and c == 2:
+        image = pygame.image.load("crownfall_images/Archie.png").convert_alpha()
+        scaled_image = pygame.transform.scale(image, (262, 400))
+        surface.blit(scaled_image, (75, 125))
+    elif l == 1 and r == 2 and c == 2:
+        image = pygame.image.load("crownfall_images/kingtower2.png").convert_alpha()
+        surface.blit(image, (100, 215))
+    elif l == 2 and r == 2 and c == 2:
+        image = pygame.image.load("crownfall_images/Master_chief.png").convert_alpha()
+        scaled_image = pygame.transform.scale(image, (140, 270))
+        surface.blit(scaled_image, (100, 225))
+    else:
+        image = pygame.image.load("crownfall_images/Enemy.png").convert_alpha()
+        scaled_image = pygame.transform.scale(image, (500, 282))
+        surface.blit(scaled_image, (20, 250))
+
     # Six buttons
     btn_names = ["Health Potion", "Strength Potion", "Special Attack", "Attack", "Defend", "Run"]
     btn_rects = []
@@ -3273,3 +3292,4 @@ while running:
             feedback = ""
     pygame.display.flip()
 pygame.quit()
+
