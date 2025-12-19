@@ -261,25 +261,25 @@ health = max_health
 # Boss dialogue setup
 # Key = (level, boss_type)
 boss_dialogues = {
-    (0, "illager"): [
-        "Illager: Another fool wanders into my road.",
-        "Illager: I've crushed merchants, guards… heroes too.",
+    (0, "boss1"): [
+        "Kinght: Another fool wanders into my road.",
+        "Knight: I've crushed merchants, guards… heroes too.",
         "You: Then you won't mind one more challenger.",
-        "Illager: Draw your blade."
+        "Knight: Draw your blade."
     ],
 
-    (1, "king"): [
+    (1, "boss2"): [
         "King: Kneel.",
         "King: I rule by strength, not mercy.",
         "You: Your crown was stolen. I'm taking it back.",
         "King: Try and die where you stand."
     ],
 
-    (2, "chief"): [
-        "Chief: I smell fear.",
-        "Chief: This land breaks warriors stronger than you.",
+    (2, "boss3"): [
+        "God: I smell fear.",
+        "God: This land breaks warriors stronger than you.",
         "You: I didn't come to turn back.",
-        "Chief: Die"
+        "God: That's right, you came here to die."
     ]
 }
 boss_dialogue_played = [False] * LEVELS
@@ -335,7 +335,7 @@ def draw_objects(x, y, obj_type, surface):
     def scale(name, w, h):
         """Returns scaled width & height if object should be scaled up or down."""
         # Only certain objects were flagged to scale 1.5x and .75x
-        scale_up_list = {"Rock_1", "Rock_2", "Wall_1", "Wall_2"}
+        scale_up_list = {"Rock_1", "Rock_2", "Wall_1", "Wall_2", "boss3"}
         scale_down_list = {"Villager", "Gold"}
         if name in scale_up_list:
             return w * 1.5, h * 1.5
@@ -389,8 +389,8 @@ def draw_objects(x, y, obj_type, surface):
         return rect
 
     #Enemies
-    elif obj_type == "illager":
-        rect = load_img("Archie", 524, 800)
+    elif obj_type == "boss1":
+        rect = load_img("Lvl_1_Boss", 524, 800)
         colliders.append(rect)
         enemy_tiles.append(rect)
         enemy_rects.append(rect)
@@ -398,8 +398,8 @@ def draw_objects(x, y, obj_type, surface):
         enemy_health.append(150)
         enemy_max_health.append(150)
         return rect 
-    elif obj_type == "king":
-        rect = load_img("kingtower2", 350, 500)
+    elif obj_type == "boss2":
+        rect = load_img("Lvl_2_Boss", 350, 500)
         colliders.append(rect)
         enemy_tiles.append(rect)
         enemy_rects.append(rect)
@@ -407,8 +407,8 @@ def draw_objects(x, y, obj_type, surface):
         enemy_health.append(200)
         enemy_max_health.append(200)
         return rect
-    elif obj_type == "chief":
-        rect = load_img("Master_chief", 244, 504)
+    elif obj_type == "boss3":
+        rect = load_img("Lvl_3_Boss", 400, 504)
         colliders.append(rect)
         enemy_tiles.append(rect)
         enemy_rects.append(rect)
@@ -629,8 +629,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         for y in [150, 151, 152, 153, 154, 155, 156, 157, 158]:
             if can_draw(500, y, c_Gold):    
                 draw_objects(500, y, "gold", surface)   #Gold
-        if can_draw(189, -200, dead_enemies):
-            draw_objects(189, -200, "illager", surface) #Boss Illager
+        if can_draw(189, -100, dead_enemies):
+            draw_objects(189, -100, "boss1", surface) #Boss
 
     # ───────── LEVEL 2 ─────────
     # Level 2: Bottom Left
@@ -763,7 +763,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(150, 100, c_Artifacts):
             draw_objects(150, 100, "artifact", surface) # Artifact
         if can_draw(200, 50, dead_enemies):
-            draw_objects(200, 50, "king", surface) # Boss King Tower
+            draw_objects(200, 50, "boss2", surface) # Boss
 
     # ───────── LEVEL 3 ─────────
     # Level 3: Bottom Left
@@ -851,7 +851,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         if can_draw(600, 250, c_Gold):
             draw_objects(600, 250, "gold", surface) # Gold
         if can_draw(200, 150, dead_enemies):
-            draw_objects(200, 150, "chief", surface) # Boss Master Chief
+            draw_objects(200, 150, "boss3", surface) # Boss
 
     # Save minimap data for the 
     # Tuple = (level, row, col)
@@ -1472,16 +1472,16 @@ def draw_combat_screen(surface):
     # Loads the enemy in the battle
     l, r, c = current_room
     if l == 0 and r == 2 and c == 2:
-        image = pygame.image.load("crownfall_images/Archie.png").convert_alpha()
-        scaled_image = pygame.transform.scale(image, (262, 400))
-        surface.blit(scaled_image, (75, 125))
+        image = pygame.image.load("crownfall_images/Lvl_1_Boss.png").convert_alpha()
+        scaled_image = pygame.transform.scale(image, (242, 375))
+        surface.blit(scaled_image, (75, 170))
     elif l == 1 and r == 2 and c == 2:
-        image = pygame.image.load("crownfall_images/kingtower2.png").convert_alpha()
-        surface.blit(image, (100, 215))
+        image = pygame.image.load("crownfall_images/Lvl_2_Boss.png").convert_alpha()
+        surface.blit(image, (75, 260))
     elif l == 2 and r == 2 and c == 2:
-        image = pygame.image.load("crownfall_images/Master_chief.png").convert_alpha()
-        scaled_image = pygame.transform.scale(image, (140, 270))
-        surface.blit(scaled_image, (100, 225))
+        image = pygame.image.load("crownfall_images/Lvl_3_Boss.png").convert_alpha()
+        scaled_image = pygame.transform.scale(image, (160, 290))
+        surface.blit(scaled_image, (100, 215))
     else:
         image = pygame.image.load("crownfall_images/Enemy.png").convert_alpha()
         surface.blit(image, (80, 275))
@@ -2525,11 +2525,11 @@ while running:
                         hp = enemy_max_health[idx]
 
                         if hp == 150:
-                            boss_type = "illager"
+                            boss_type = "boss1"
                         elif hp == 200:
-                            boss_type = "king"
+                            boss_type = "boss2"
                         elif hp == 250:
-                            boss_type = "chief"
+                            boss_type = "boss3"
                         else:
                             continue
 
@@ -3250,6 +3250,7 @@ while running:
     # ----- Water Movement Check -----
     in_water = any(player.colliderect(wrect) for wrect in water_tiles)
     if in_water:
+        ANIM_SPEED = 12
         dx *= 0.5
         dy *= 0.5
     # ----- Speed Potion Effect -----
