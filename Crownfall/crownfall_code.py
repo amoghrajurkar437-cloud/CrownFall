@@ -2518,32 +2518,31 @@ while running:
                 # ───── START BOSS DIALOGUE ─────
                 if not combat_active and not dialogue_active:
                     for rect in enemy_tiles:
-                        if rect.collidepoint(pygame.mouse.get_pos()):
-                            level = current_room[0]
+                        level = current_room[0]
 
-                            # Determine boss type by max health
-                            idx = enemy_rects.index(rect)
-                            hp = enemy_max_health[idx]
+                        # Determine boss type by max health
+                        idx = enemy_rects.index(rect)
+                        hp = enemy_max_health[idx]
 
-                            if hp == 150:
-                                boss_type = "illager"
-                            elif hp == 200:
-                                boss_type = "king"
-                            elif hp == 250:
-                                boss_type = "chief"
-                            else:
-                                continue
-
-                            # Only play once per level
-                            if not boss_dialogue_played[level]:
-                                boss_dialogue_played[level] = True
-                                start_boss_dialogue(level, boss_type)
-                                continue
-
-                            # Dialogue already played → start combat
-                            combat_active = True
-                            current_enemy_index = idx
+                        if hp == 150:
+                            boss_type = "illager"
+                        elif hp == 200:
+                            boss_type = "king"
+                        elif hp == 250:
+                            boss_type = "chief"
+                        else:
                             continue
+
+                        # Only play once per level
+                        if not boss_dialogue_played[level]:
+                            boss_dialogue_played[level] = True
+                            start_boss_dialogue(level, boss_type)
+                            continue
+
+                        # Dialogue already played → start combat
+                        combat_active = True
+                        current_enemy_index = idx
+                        continue
 
             # If right-click and dialogue active -> advance dialogue 
                 if trading_prompt_active or trade_menu_active:
