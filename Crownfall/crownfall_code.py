@@ -28,7 +28,7 @@ GRID_HEIGHT = 3
 LEVELS = 3
 MAX_UPGRADE_LEVEL = 5
 
-# Basic set upt
+# Basic set up
 pygame.display.set_caption("CROWNFALL")
 screen = pygame.display.set_mode((ROOM_WIDTH, ROOM_HEIGHT))
 clock = pygame.time.Clock()
@@ -52,7 +52,7 @@ damage_multiplier = 1
 strength_multiplier = 2
 
 # Inventory set up
-inventory = {"Gold": 150, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
+inventory = {"Gold": 0, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
 inventory_limits = {"Gold": 150, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
 
 # Collected sets
@@ -95,6 +95,7 @@ end_screen_active = False # End screen flag
 trade_prompt_key = None # Tracks which villager is offering trade
 trade_pending_key = None # Marks villager to show trade prompt after dialogue
 active_villager_index = None # Which villager for multiple in a room
+dialogue_just_finished = False # To trigger trade prompt after dialogue
 current_enemy_index = None # Which enemy for multiple in a room
 previous_room = None # Tracks last room for enemy respawn logic
 enemy_last_action = None # Tracks last action by enemy to not repeat
@@ -130,6 +131,7 @@ campfire_tiles = []
 
 # Dialogue set up
 dialogue_index = 0
+last_dialogue_index = -1
 current_dialogue = []
 
 # Key format = (level, row, column, villager_index)
@@ -304,6 +306,28 @@ for direction in player_images:
         ).convert_alpha()
         img = pygame.transform.scale(img, (80, 80))
         player_images[direction].append(img)
+
+# Music setup
+intro_played = False
+main_music_active = False
+victory_music_played = False
+running_sound_playing = False
+is_moving = False
+home_music_active = False
+death_music_played = False
+was_in_lore = False
+was_on_home = False
+current_music = None  # "home", "main", "intro", "death", "victory"
+pygame.mixer.music.set_volume(0.5)
+INTRO_MUSIC = "crownfall_sounds/intro.mp3"
+MAIN_MUSIC = "crownfall_sounds/main_loop.mp3"
+VICTORY_MUSIC = "crownfall_sounds/victory.mp3"
+DEATH_MUSIC = "crownfall_sounds/death.mp3"
+HOME_MUSIC = "crownfall_sounds/home.mp3"
+pickup_sound = pygame.mixer.Sound("crownfall_sounds/pick_up.mp3")
+run_sound = pygame.mixer.Sound("crownfall_sounds/run.wav")
+pickup_sound.set_volume(0.5)
+run_sound.set_volume(0.6)
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -2335,6 +2359,12 @@ def load_game(slot):
     c_Strength_Potions.clear()
     c_Strength_Potions.update(tuple(v) for v in data["c_Strength_Potions"])
 
+    # Music state
+    intro_played = True
+    main_music_active = True
+    pygame.mixer.music.load(MAIN_MUSIC)
+    pygame.mixer.music.play(-1)
+
     # Enemies & bosses
     dead_enemies.clear()
     dead_enemies.update(tuple(v) for v in data["dead_enemies"])
@@ -2343,11 +2373,100 @@ def load_game(slot):
     level_passed[:] = data["level_passed"]
     boss_dialogue_played = [False] * LEVELS
 
+# Music management
+def update_music():
+    global was_in_lore, current_music
+
+    # --- LORE LOCK ---
+    if lore_screen_active:
+        if current_music != "intro":
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(INTRO_MUSIC)
+            pygame.mixer.music.play(0)
+            current_music = "intro"
+            was_in_lore = True
+        return
+
+    # --- EXITING LORE -> GAMEPLAY ---
+    if was_in_lore and not lore_screen_active:
+        pygame.mixer.music.stop()
+        pygame.mixer.music.load(MAIN_MUSIC)
+        pygame.mixer.music.play(-1)
+        current_music = "main"
+        was_in_lore = False
+        return
+
+    # --- HOME + INSTRUCTIONSdd ---
+    if on_home or instructions_active:
+        if current_music != "home":
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(HOME_MUSIC)
+            pygame.mixer.music.play(-1)
+            current_music = "home"
+        return
+
+    # --- DEATH SCREEN ---
+    if player_dead:
+        if current_music != "death":
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(DEATH_MUSIC)
+            pygame.mixer.music.play(0)
+            current_music = "death"
+        return
+
+    # --- VICTORY SCREEN ---
+    if end_screen_active:
+        if current_music != "victory":
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(VICTORY_MUSIC)
+            pygame.mixer.music.play(0)
+            current_music = "victory"
+        return
+
+    # --- SAVE / LOAD (PAUSE) ---
+    if save_screen_active or load_screen_active:
+        pygame.mixer.music.pause()
+        return
+
+    # --- COMBAT (PAUSE) ---
+    if combat_active:
+        pygame.mixer.music.pause()
+        return
+
+    # --- GAMEPLAY (RESUME MAIN LOOP) ---
+    if current_music == "main":
+        pygame.mixer.music.unpause()
+        return
+
+    # --- GAMEPLAY FALLBACK (START MAIN LOOP) ---
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load(MAIN_MUSIC)
+    pygame.mixer.music.play(-1)
+    current_music = "main"
+
+# Sound effects
+def update_running_sound(is_moving):
+    global is_running_sound_playing
+
+    # Don't play running sound on non-gameplay screens
+    if on_home or combat_active or player_dead or end_screen_active:
+        run_sound.stop()
+        is_running_sound_playing = False
+        return
+
+    if is_moving:
+        if not is_running_sound_playing:
+            run_sound.play(-1)
+            is_running_sound_playing = True
+    else:
+        if is_running_sound_playing:
+            run_sound.stop()
+            is_running_sound_playing = False
+
 # MAIN LOOP
 running = True
 while running:
     dt = clock.tick(60)
-    keys = pygame.key.get_pressed()
     # ---------- EVENT HANDLING ----------
     for event in pygame.event.get():
         # --- INSTA-KILL BUTTON (K) ---
@@ -2378,8 +2497,8 @@ while running:
                 if boss_phase[lvl_idx] < boss_max_phases:
                     boss_phase[lvl_idx] += 1
                     feedback, feedback_timer = (f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0)
-                    # Restore boss HP for new phase
-                    new_hp = 300 + lvl_idx * 100
+                    # Restore boss HP for new phase (use 80% of previous max)
+                    new_hp = int(enemy_max_health[current_enemy_index] * 2)
                     enemy_health[current_enemy_index] = new_hp
                     enemy_max_health[current_enemy_index] = new_hp
                     # Reset combat state for new phase
@@ -2505,14 +2624,20 @@ while running:
         # ----- Mouse interactions -----
         if event.type == pygame.MOUSEBUTTONDOWN and not on_home:
             if event.button == 3:
-                # ───── BOSS DIALOGUE ADVANCE ─────
+                # Dialogue advancement
                 if dialogue_active:
-                    dialogue_index += 1
-
-                    # If dialogue finished, wait for next click to start combat
-                    if dialogue_index >= len(current_dialogue):
+                    # Only advance if NOT last line
+                    if dialogue_index < len(current_dialogue) - 1:
+                        dialogue_index += 1
+                    else:
+                        # Last click ends dialogue
                         dialogue_active = False
                         dialogue_index = 0
+                        # Trigger trade ONCE
+                        if trade_pending_key:
+                            trading_prompt_active = True
+                            trade_prompt_key = trade_pending_key
+                            trade_pending_key = None
                     continue
 
                 # ───── START BOSS DIALOGUE ─────
@@ -2544,22 +2669,8 @@ while running:
                         current_enemy_index = idx
                         continue
 
-            # If right-click and dialogue active -> advance dialogue 
+                # If right-click and dialogue active -> advance dialogue 
                 if trading_prompt_active or trade_menu_active:
-                    continue
-
-                if dialogue_active:
-                    # Advance dialogue line
-                    dialogue_index += 1
-                    # If dialogue finished, close and maybe open trade prompt
-                    if dialogue_index >= len(current_dialogue):
-                        dialogue_active = False
-                        dialogue_index = 0
-                        # If this villager was set to trigger trade after dialogue, open prompt
-                        if trade_pending_key:
-                            trading_prompt_active = True
-                            trade_prompt_key = trade_pending_key
-                            trade_pending_key = None
                     continue
 
                 # If not currently in dialogue, right-click should attempt to start dialogue with nearby villager
@@ -2748,8 +2859,8 @@ while running:
                                             boss_phase[lvl_idx] += 1
                                             feedback, feedback_timer = f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0
 
-                                            # Give new boss HP
-                                            new_hp = 300 + lvl_idx * 100
+                                            # Give new boss HP (use 80% of previous max)
+                                            new_hp = int(enemy_max_health[current_enemy_index] * 2)
                                             enemy_health[current_enemy_index] = new_hp
                                             enemy_max_health[current_enemy_index] = new_hp
                                             # Reset combat state
@@ -2828,8 +2939,8 @@ while running:
                                             boss_phase[lvl_idx] += 1
                                             feedback, feedback_timer = f"The boss transforms into Phase {boss_phase[lvl_idx]}!", 3.0
 
-                                            # Give new boss HP
-                                            new_hp = 300 + lvl_idx * 100
+                                            # Give new boss HP (use 80% of previous max)
+                                            new_hp = int(enemy_max_health[current_enemy_index] * 2)
                                             enemy_health[current_enemy_index] = new_hp
                                             enemy_max_health[current_enemy_index] = new_hp
 
@@ -3033,6 +3144,10 @@ while running:
                     upgrade_menu_active = False
                     feedback, feedback_timer = "", 0
                     continue
+
+    # ----- MAIN GAME LOOP -----
+    update_music()
+    update_running_sound(is_moving)
 
     # ---------- HOME SCREEN ----------
     if on_home:
@@ -3262,6 +3377,10 @@ while running:
     player.x += dx * (current_speed / base_speed)
     player.y += dy * (current_speed / base_speed)
 
+    is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d] \
+            or keys[pygame.K_UP] or keys[pygame.K_LEFT] or keys[pygame.K_DOWN] or keys[pygame.K_RIGHT]
+
+    update_running_sound(is_moving)
     if moving:
         anim_timer += 1
         if anim_timer >= ANIM_SPEED:
@@ -3300,6 +3419,7 @@ while running:
                     inventory[inventory_key] += count
                     globals()[f"c_{inventory_key.replace(' ', '_')}"].add((*current_room, ax, ay))
                     message, message_color, message_timer = msg, color, 0.75
+                    pickup_sound.play()
                 else:
                     message, message_color, message_timer = f"Inventory full of {inventory_key}", (255, 0, 0), 0.75
 
@@ -3332,10 +3452,9 @@ while running:
     # Dialogue End Check
     if dialogue_active and active_villager_index is not None:
         vrect = villager_tiles[active_villager_index] if 0 <= active_villager_index < len(villager_tiles) else None
-        if not vrect or not player.colliderect(vrect.inflate(60, 60)):
+        if not vrect or not player.colliderect(vrect.inflate(100, 100)):
             # If player moves away while dialogue pending trade, clear pending trade
             dialogue_active, current_dialogue, dialogue_index, active_villager_index = False, [], 0, None
-            trade_pending_key = None
 
     # If trading prompt is active, close it if player moves away from villager
     if trading_prompt_active and trade_prompt_key is not None:
@@ -3346,7 +3465,7 @@ while running:
             trade_prompt_key = None
         else:
             vrect = villager_tiles[idx]
-            if not player.colliderect(vrect.inflate(60, 60)):
+            if not player.colliderect(vrect.inflate(100, 100)):
                 trading_prompt_active = False
                 trade_prompt_key = None
 
