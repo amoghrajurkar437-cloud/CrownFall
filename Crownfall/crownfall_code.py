@@ -39,7 +39,6 @@ title_font = pygame.font.Font("crownfall_fonts/MedievalSharp-Regular.ttf", 80)
 player = pygame.Rect(50, ROOM_HEIGHT - 100, 80, 80)
 facing = "up"
 current_room = [0, 0, 0]
-current_level = current_room[0]
 room_colliders = {}
 
 # Speed setup
@@ -52,7 +51,7 @@ damage_multiplier = 1
 strength_multiplier = 2
 
 # Inventory set up
-inventory = {"Gold": 0, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
+inventory = {"Gold": 150, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
 inventory_limits = {"Gold": 150, "Artifacts": 7, "Health Potions": 5, "Speed Potions": 5, "Strength Potions": 5, "Upgrade Tokens": 15, "Enemy Shards": 150}
 
 # Collected sets
@@ -101,8 +100,8 @@ previous_room = None # Tracks last room for enemy respawn logic
 enemy_last_action = None # Tracks last action by enemy to not repeat
 
 # Armor and Weapons set up
-armor_level = 2  # Player's armor upgrade level (increases max health)
-weapon_level = 5  # Player's weapon upgrade level (increases damage)
+armor_level = 0  # Player's armor upgrade level (increases max health)
+weapon_level = 0  # Player's weapon upgrade level (increases damage)
 inventory_level = 0  # Player's inventory-size upgrade level (increases limits)
 gold_pickup_level = 0  # Gold-per-pickup upgrade level
 # Base multipliers derived from upgrades
@@ -243,9 +242,11 @@ battle_tips = [
     "Defend to reduce incoming damage!",
     "Strength potions increase your attack!",
     "Watch enemy HP—some enemies heal at low health.",
-    "Special Attack deals double damage",
+    "Special Attack deals triple damage",
     "Special Attack can be used only once per battle.",
-    "You can Run if the fight looks bad!"
+    "You can Run if the fight looks bad!",
+    "Use Health Potions to heal mid-battle!",
+    "Defeating enemies gives Enemy Shards!",
 ]
 tip_index = 0
 tip_timer = 0
@@ -257,35 +258,31 @@ boss_max_phases = 2 # Every boss has 2 phases
 level_passed = [False, False]
 
 # Health set up
-max_health = 100 + armor_level * 100
+max_health = 100 + armor_level * 100  # Base 100 + 100 per armor level
 health = max_health
 
 # Boss dialogue setup
 # Key = (level, boss_type)
 boss_dialogues = {
     (0, "boss1"): [
-        "Kinght: Another fool wanders into my road.",
-        "Knight: I've crushed merchants, guards… heroes too.",
-        "You: Then you won't mind one more challenger.",
-        "Knight: Draw your blade."
+        "Knight: You think you can do anything, I'm not even the begining.",
+        "Knight: You can crush a 1000 more of me but you can't beat him.",
+        "You: Your king? I crush him too.",
+        "Knight: No, not my king, it's something else."
     ],
 
     (1, "boss2"): [
-        "King: Kneel.",
-        "King: I rule by strength, not mercy.",
-        "You: Your crown was stolen. I'm taking it back.",
-        "King: Try and die where you stand."
+        "King: AHHAHAHAHHHAAAHHA.",
+        "King: Wait, I'm free now, YES. I'm not being controlled anymore.",
+        "You: ???.",
+        "You: Who was controlling you?",
+        "King: Don't even try kid, he's a literal god, get out of here",
+        "King: I'm leaving town, after I gain my trust back, you leave too."
     ],
-
-    (2, "boss3"): [
-        "God: I smell fear.",
-        "God: This land breaks warriors stronger than you.",
-        "You: I didn't come to turn back.",
-        "God: That's right, you came here to die."
-    ]
 }
 boss_dialogue_played = [False] * LEVELS
 current_boss_dialogue = []
+enemy_roles = []
 
 # ─── PLAYER ANIMATIONS ───
 last_facing = "up"
@@ -318,16 +315,24 @@ death_music_played = False
 was_in_lore = False
 was_on_home = False
 current_music = None  # "home", "main", "intro", "death", "victory"
-pygame.mixer.music.set_volume(0.5)
+# Mute toggle
+is_muted = False
+# Store volumes so unmute restores correctly
+MUSIC_VOLUME = 0.5
+SFX_VOLUME_PICKUP = 0.5
+SFX_VOLUME_RUN = 0.6
 INTRO_MUSIC = "crownfall_sounds/intro.mp3"
 MAIN_MUSIC = "crownfall_sounds/main_loop.mp3"
+BATTLE_INTRO_MUSIC = "crownfall_sounds/battle_intro.mp3"
+BATTLE_MUSIC = "crownfall_sounds/battle_main.mp3"
 VICTORY_MUSIC = "crownfall_sounds/victory.mp3"
 DEATH_MUSIC = "crownfall_sounds/death.mp3"
 HOME_MUSIC = "crownfall_sounds/home.mp3"
 pickup_sound = pygame.mixer.Sound("crownfall_sounds/pick_up.mp3")
 run_sound = pygame.mixer.Sound("crownfall_sounds/run.wav")
-pickup_sound.set_volume(0.5)
-run_sound.set_volume(0.6)
+pygame.mixer.music.set_volume(MUSIC_VOLUME)
+pickup_sound.set_volume(SFX_VOLUME_PICKUP)
+run_sound.set_volume(SFX_VOLUME_RUN)
 
 # DRAWING ELEMENTS
 def draw_objects(x, y, obj_type, surface):
@@ -406,8 +411,6 @@ def draw_objects(x, y, obj_type, surface):
         rect = load_img("Wall_2", 150, 200)
         colliders.append(rect)
         return rect
-
-    # Walk through decor
     elif obj_type == "path":
         rect = load_img("Path", 100, 100)
         return rect
@@ -421,6 +424,7 @@ def draw_objects(x, y, obj_type, surface):
         enemy_spawn_points.append((x, y))
         enemy_health.append(150)
         enemy_max_health.append(150)
+        enemy_roles.append(None)  # Bosses have no role
         return rect 
     elif obj_type == "boss2":
         rect = load_img("Lvl_2_Boss", 350, 500)
@@ -430,6 +434,7 @@ def draw_objects(x, y, obj_type, surface):
         enemy_spawn_points.append((x, y))
         enemy_health.append(200)
         enemy_max_health.append(200)
+        enemy_roles.append(None)  # Bosses have no role
         return rect
     elif obj_type == "boss3":
         rect = load_img("Lvl_3_Boss", 400, 504)
@@ -439,6 +444,7 @@ def draw_objects(x, y, obj_type, surface):
         enemy_spawn_points.append((x, y))
         enemy_health.append(250)
         enemy_max_health.append(250)
+        enemy_roles.append(None)  # Bosses have no role
         return rect
     elif obj_type == "enemy":
         rect = load_img("Enemy", 100, 100)
@@ -446,8 +452,22 @@ def draw_objects(x, y, obj_type, surface):
         enemy_tiles.append((rect))
         enemy_rects.append((rect))
         enemy_spawn_points.append((x, y))
-        enemy_health.append(100)
-        enemy_max_health.append(100)
+        base_hp = 100 + (current_room[0] * 50) # Base HP increases with level
+        enemy_health.append(base_hp)
+        enemy_max_health.append(base_hp)
+        # ---- ROLE ASSIGNMENT ----
+        role = random.choice(["beserk", "guardian", "assassin", "tank"])
+        enemy_roles.append(role)
+        # ---- ROLE HP MODIFIERS ----
+        if role == "guardian":
+            enemy_health[-1] = int(enemy_health[-1] * 1.2)
+        elif role == "tank":
+            enemy_health[-1] = int(enemy_health[-1] * 1.4)
+        elif role == "assassin":
+            enemy_health[-1] = int(enemy_health[-1] * 0.8)
+        elif role == "beserk":
+            enemy_health[-1] = int(enemy_health[-1] * 1.0)
+        enemy_max_health[-1] = enemy_health[-1]
         return rect
 
     # Interactables 
@@ -515,6 +535,7 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
         enemy_health.clear()
         enemy_max_health.clear()
         enemy_spawn_points.clear()
+        enemy_roles.clear()
 
     # Update room tracking
     previous_room = current
@@ -677,6 +698,8 @@ def draw_room(surface, level, row, col, c_Artifacts, c_Gold, c_Health_Potions):
             draw_objects(500, y, "path", surface) # Path
         for x in [600,700]:
             draw_objects(x, 200, "path", surface) # Path
+        for y in [325, 500, 700]:
+            draw_objects(650, y, "wall2", surface) # Wall 2
         if can_draw(600, 500, dead_enemies):
             draw_objects(600, 500, "enemy", surface) # Enemy
         draw_objects(400, 300, "rock2", surface)  # Rock 2
@@ -1483,6 +1506,7 @@ def draw_combat_screen(surface):
         pygame.draw.rect(surface, (255,255,255), (ex, ey, e_bar_w, e_bar_h), 2)
         pygame.draw.rect(surface, (255,0,0), (ex, ey, e_bar_w, e_bar_h))
         e_pct = max(0, enemy_health[current_enemy_index] / enemy_max_health[current_enemy_index])
+        role = enemy_roles[current_enemy_index]
         pygame.draw.rect(surface, (0,255,0), (ex, ey, e_bar_w * e_pct, e_bar_h))
     e_label = font.render("ENEMY", True, (255,255,255))
     e_label_x = ex + (e_bar_w // 2) - (e_label.get_width() // 2)
@@ -1492,6 +1516,29 @@ def draw_combat_screen(surface):
     e_max = enemy_max_health[current_enemy_index]
     e_hp_text = font.render(f"{int(e_cur)}/{e_max}", True, (255,255,255))
     surface.blit(e_hp_text, (ex + e_bar_w//2 - e_hp_text.get_width()//2, ey + e_bar_h + 5))
+    # --- Enemy Role Display ---
+    if combat_active and current_enemy_index is not None:
+        role = enemy_roles[current_enemy_index]
+        if role is not None: # Boss safety
+            role_text = font.render("", True, (255, 200, 50))
+            if role == "tank":
+                role_text = font.render(f"{role.upper()} / MORE HEALTH", True, (255, 200, 50))
+            elif role == "beserk":
+                role_text = font.render(f"{role.upper()} / MORE OFFENSE", True, (255, 80, 150))
+            elif role == "guardian":
+                role_text = font.render(f"{role.upper()} / MORE DEFENSE", True, (100, 200, 100))
+            elif role == "assassin":
+                role_text = font.render(f"{role.upper()} / MORE DAMAGE & LESS HEALTH", True, (255, 50, 50))
+            else:
+                pass
+            role_rect = role_text.get_rect(center=(ROOM_WIDTH // 2, 240))
+
+            # Clear background behind text (prevents stacking artifacts)
+            bg = pygame.Surface((role_rect.width + 20, role_rect.height + 10))
+            bg.fill((0, 0, 0))
+            screen.blit(bg, (role_rect.x - 10, role_rect.y - 5))
+
+            screen.blit(role_text, role_rect)
 
     # Loads the enemy in the battle
     l, r, c = current_room
@@ -1613,7 +1660,7 @@ def draw_combat_screen(surface):
 
 # ENEMY TURN AI
 def run_enemy_turn():
-    """Smarter enemy AI with action memory and contextual behavior."""
+    """Smarter enemy AI with action memory, roles, and contextual behavior."""
     global health, enemy_turn_pending, player_defending, enemy_defending
     global enemy_heals_used, player_dead, combat_active, feedback, feedback_timer
     global enemy_last_action
@@ -1628,6 +1675,11 @@ def run_enemy_turn():
     is_boss = (r_idx == GRID_HEIGHT - 1 and c_idx == GRID_WIDTH - 1)
     boss_phase_num = boss_phase[lvl_idx] if is_boss else None
 
+    # --- Role (bosses have None) ---
+    role = enemy_roles[current_enemy_index] if not is_boss else None
+    if role is None:
+        role = "normal"
+
     # --- Base weights ---
     weights = {
         "attack": 40,
@@ -1635,7 +1687,22 @@ def run_enemy_turn():
         "heal": 20
     }
 
-    # --- Player defending → enemy less likely to defend ---
+    # ROLE-BASED MODIFIERS
+    if role == "berserk":
+        weights["attack"] += 25
+        weights["defend"] -= 10
+
+    elif role == "guardian":
+        weights["defend"] += 10
+        if low_hp:
+            weights["defend"] += 20
+        weights["attack"] -= 5
+
+    elif role == "assassin":
+        weights["attack"] += 15
+        weights["defend"] -= 10
+
+    # --- Player defending → enemy more aggressive ---
     if player_defending:
         weights["defend"] -= 15
         weights["attack"] += 10
@@ -1654,10 +1721,10 @@ def run_enemy_turn():
     if not can_heal:
         weights["heal"] = 0
 
-    # --- Rule 3: Boss Phase 1 behavior ---
+    # --- Boss Phase 1 behavior ---
     if is_boss and boss_phase_num == 1:
-        weights["heal"] = 0 # no healing
-        weights["attack"] += 20 # aggressive
+        weights["heal"] = 0
+        weights["attack"] += 20
         weights["defend"] -= 10
 
     # --- Low HP behavior ---
@@ -1675,17 +1742,12 @@ def run_enemy_turn():
     for action, weight in weights.items():
         actions.extend([action] * weight)
 
-    if not actions:
-        enemy_choice = "attack"
-    else:
-        enemy_choice = random.choice(actions)
-
+    enemy_choice = random.choice(actions) if actions else "attack"
     enemy_last_action = enemy_choice
 
     # EXECUTE ACTION
-
     if enemy_choice == "attack":
-        # Damage
+        # --- Damage ---
         if is_boss:
             if boss_phase_num == 1:
                 dmg = random.randint(15, 20)
@@ -1715,10 +1777,12 @@ def run_enemy_turn():
         feedback_timer = 2.0
         player_defending = False
 
-        if health == 0:
+        if health <= 0:
             combat_active = False
             player_dead = True
             boss_phase[lvl_idx] = 1
+            enemy_turn_pending = False
+            return
 
     elif enemy_choice == "defend":
         enemy_defending = True
@@ -1730,6 +1794,7 @@ def run_enemy_turn():
         enemy_heals_used += 1
         feedback, feedback_timer = f"Enemy heals for {heal_amount} HP!", 2.0
 
+    # --- End enemy turn ---
     enemy_turn_pending = False
 
 # Boss Dialogue
@@ -1783,6 +1848,7 @@ def draw_death_screen(surface):
 
     load_text = font.render("LOAD", True, (255, 255, 255))
     surface.blit(load_text, load_text.get_rect(center=death_load_btn.center))
+    return death_home_btn
 
 # DRAWING END SCREEN
 def draw_end_screen(surface):
@@ -2204,7 +2270,7 @@ def reset_game():
     global visited_rooms, minimap_memory, combat_active
     global trade_menu_active, trading_prompt_active, dialogue_active
     global lore_screen_active, instructions_active, hud_visible, map_visible, speed_potion_duration
-    global boss_phase, current_level, armor_level, weapon_level
+    global boss_phase, armor_level, weapon_level
     global inventory_level, gold_pickup_level
 
     health = 100
@@ -2296,7 +2362,8 @@ def save_game(slot):
 # Loading Game
 def load_game(slot):
     """Reading the file and loading the game data"""
-    global health, max_health
+    global health, max_health, inventory, visited_rooms, minimap_memory
+    global dead_enemies, boss_defeated, boss_phase, level_passed
     global armor_level, weapon_level, inventory_level, gold_pickup_level
     global weapon_base_multiplier, gold_per_pickup
     global speed_potion_duration, strength_active
@@ -2372,6 +2439,7 @@ def load_game(slot):
     boss_phase[:] = data["boss_phase"]
     level_passed[:] = data["level_passed"]
     boss_dialogue_played = [False] * LEVELS
+
 
 # Music management
 def update_music():
@@ -2449,7 +2517,7 @@ def update_running_sound(is_moving):
     global is_running_sound_playing
 
     # Don't play running sound on non-gameplay screens
-    if on_home or combat_active or player_dead or end_screen_active:
+    if on_home or combat_active or player_dead or end_screen_active or lore_screen_active or instructions_active or save_screen_active or load_screen_active or dialogue_active:
         run_sound.stop()
         is_running_sound_playing = False
         return
@@ -2462,6 +2530,20 @@ def update_running_sound(is_moving):
         if is_running_sound_playing:
             run_sound.stop()
             is_running_sound_playing = False
+
+# Mute toggle
+def toggle_mute():
+    global is_muted
+    if is_muted:
+        # Mute everything
+        pygame.mixer.music.set_volume(0)
+        pickup_sound.set_volume(0)
+        run_sound.set_volume(0)
+    else:
+        # Restore volumes
+        pygame.mixer.music.set_volume(MUSIC_VOLUME)
+        pickup_sound.set_volume(SFX_VOLUME_PICKUP)
+        run_sound.set_volume(SFX_VOLUME_RUN)
 
 # MAIN LOOP
 running = True
@@ -2508,6 +2590,11 @@ while running:
 
                 # -------- FINAL PHASE DEFEATED --------
                 boss_defeated[lvl_idx] = True
+                if not boss_dialogue_played[lvl_idx]:
+                    current_dialogue = boss_dialogues[(lvl_idx, f"boss{lvl_idx + 1}")]
+                    dialogue_index = 0
+                    dialogue_active = True
+                    boss_dialogue_played[lvl_idx] = True
                 if all(boss_defeated):
                     end_screen_active = True
                 dead_enemies.add((*current_room, ax, ay))
@@ -2517,6 +2604,7 @@ while running:
                 enemy_rects.pop(current_enemy_index)
                 enemy_tiles.pop(current_enemy_index)
                 enemy_spawn_points.pop(current_enemy_index)
+                enemy_roles.pop(current_enemy_index)
                 continue
 
             else:
@@ -2529,6 +2617,7 @@ while running:
                 enemy_rects.pop(current_enemy_index)
                 enemy_tiles.pop(current_enemy_index)
                 enemy_spawn_points.pop(current_enemy_index)
+                enemy_roles.pop(current_enemy_index)
                 continue
 
         # --- DELETE ALL SAVES ---
@@ -2639,35 +2728,6 @@ while running:
                             trade_prompt_key = trade_pending_key
                             trade_pending_key = None
                     continue
-
-                # ───── START BOSS DIALOGUE ─────
-                if not combat_active and not dialogue_active:
-                    for rect in enemy_tiles:
-                        level = current_room[0]
-
-                        # Determine boss type by max health
-                        idx = enemy_rects.index(rect)
-                        hp = enemy_max_health[idx]
-
-                        if hp == 150:
-                            boss_type = "boss1"
-                        elif hp == 200:
-                            boss_type = "boss2"
-                        elif hp == 250:
-                            boss_type = "boss3"
-                        else:
-                            continue
-
-                        # Only play once per level
-                        if not boss_dialogue_played[level]:
-                            boss_dialogue_played[level] = True
-                            start_boss_dialogue(level, boss_type)
-                            continue
-
-                        # Dialogue already played → start combat
-                        combat_active = True
-                        current_enemy_index = idx
-                        continue
 
                 # If right-click and dialogue active -> advance dialogue 
                 if trading_prompt_active or trade_menu_active:
@@ -2872,6 +2932,11 @@ while running:
                                             combat_active = False
                                             strength_active = False
                                             boss_defeated[lvl_idx] = True
+                                            if not boss_dialogue_played[lvl_idx]:
+                                                current_dialogue = boss_dialogues[(lvl_idx, f"boss{lvl_idx + 1}")]
+                                                dialogue_index = 0
+                                                dialogue_active = True
+                                                boss_dialogue_played[lvl_idx] = True
                                             if all(boss_defeated):
                                                 on_end_screen = True
                                             dead_enemies.add((*current_room, ax, ay))
@@ -2887,6 +2952,7 @@ while running:
                                     enemy_rects.pop(current_enemy_index)
                                     enemy_tiles.pop(current_enemy_index)
                                     enemy_spawn_points.pop(current_enemy_index)
+                                    enemy_roles.pop(current_enemy_index)
 
                             elif name == "Special Attack":
                                 if special_attack_used:
@@ -2953,6 +3019,11 @@ while running:
                                             strength_active = False
                                             combat_active = False
                                             boss_defeated[lvl_idx] = True
+                                            if not boss_dialogue_played[lvl_idx]:
+                                                current_dialogue = boss_dialogues[(lvl_idx, f"boss{lvl_idx + 1}")]
+                                                dialogue_index = 0
+                                                dialogue_active = True
+                                                boss_dialogue_played[lvl_idx] = True
                                             if all(boss_defeated):
                                                 on_end_screen = True
                                             dead_enemies.add((*current_room, ax, ay))
@@ -2970,6 +3041,7 @@ while running:
                                     enemy_rects.pop(current_enemy_index)
                                     enemy_tiles.pop(current_enemy_index)
                                     enemy_spawn_points.pop(current_enemy_index)
+                                    enemy_roles.pop(current_enemy_index)
 
                             elif name == "Defend":
                                 player_defending = True
@@ -3052,13 +3124,16 @@ while running:
 
         # ----- Toggles & Keyboard -----
         elif event.type == pygame.KEYDOWN and not on_home:
+            # --- MUTE TOGGLE ---
+            if event.key == pygame.K_TAB and pygame.key.get_mods() & pygame.KMOD_LALT == 0:
+                is_muted = not is_muted
+                toggle_mute()
+
+            # --- SAVE GAME ---
             if event.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_CTRL:
                 if not combat_active and not player_dead and not on_home:
                     save_screen_active = True
                     load_screen_active = False
-            # No controls when combat is on
-            if combat_active:
-                break
 
             # --- Villager Interaction ---
             # If trade prompt is active, handle Y/N keys here first
@@ -3289,6 +3364,7 @@ while running:
                 enemy_turn_delay -= 1
             else:
                 run_enemy_turn()
+                enemy_turn_delay = False
         combat_buttons = draw_combat_screen(screen)
         pygame.display.flip()
         continue  # <-- THIS MUST BE HERE to stop overworld from drawing
@@ -3345,22 +3421,25 @@ while running:
     moving = False
     dx = dy = 0
 
-    if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-        dx = -base_speed
-        facing = "left"
-        moving = True
-    elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-        dx = base_speed
-        facing = "right"
-        moving = True
-    elif keys[pygame.K_w] or keys[pygame.K_UP]:
-        dy = -base_speed
-        facing = "up"
-        moving = True
-    elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
-        dy = base_speed
-        facing = "down"
-        moving = True
+    if dialogue_active or combat_active or player_dead or trading_prompt_active:
+        dx = dy = 0
+    else:
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+            dx = -base_speed
+            facing = "left"
+            moving = True
+        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            dx = base_speed
+            facing = "right"
+            moving = True
+        elif keys[pygame.K_w] or keys[pygame.K_UP]:
+            dy = -base_speed
+            facing = "up"
+            moving = True
+        elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
+            dy = base_speed
+            facing = "down"
+            moving = True
 
     # ----- Water Movement Check -----
     in_water = any(player.colliderect(wrect) for wrect in water_tiles)
