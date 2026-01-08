@@ -305,6 +305,7 @@ for direction in player_images:
         player_images[direction].append(img)
 
 # Music setup
+battle_music_timer = 0.0
 intro_played = False
 main_music_active = False
 victory_music_played = False
@@ -2496,9 +2497,20 @@ def update_music():
         pygame.mixer.music.pause()
         return
 
-    # --- COMBAT (PAUSE) ---
+    # --- COMBAT ---
     if combat_active:
-        pygame.mixer.music.pause()
+        if current_music != "combat":
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(BATTLE_INTRO_MUSIC)
+            pygame.mixer.music.play(0)
+            current_music = "combat"
+            # Start battle music timer
+            battle_music_timer = 11.9  # seconds
+
+        if current_music == "combat" and not pygame.mixer.music.get_busy():
+            # Switch to looping battle music after intro
+            pygame.mixer.music.load(BATTLE_MUSIC)
+            pygame.mixer.music.play(-1)
         return
 
     # --- GAMEPLAY (RESUME MAIN LOOP) ---
@@ -2879,7 +2891,7 @@ while running:
                                     damage_multiplier = strength_multiplier * weapon_scale
                                 else:
                                     damage_multiplier = weapon_base_multiplier * weapon_scale
-                                damage = int(10 * damage_multiplier)
+                                damage = int(random.randint(10, 14) * damage_multiplier)
 
                                 # Enemy defending logic (25% full hit, 50% half, 25% miss)
                                 if enemy_defending:
@@ -3571,5 +3583,14 @@ while running:
         feedback_timer = max(0, feedback_timer - dt / 1000.0)
         if feedback_timer == 0:
             feedback = ""
+    
+    if battle_music_timer > 0:
+        battle_music_timer = max(0, battle_music_timer - dt / 1000.0)
+        if battle_music_timer == 0:
+            # Switch to combat loop music
+            pygame.mixer.music.stop()
+            pygame.mixer.music.load(BATTLE_MUSIC)
+            pygame.mixer.music.play(-1)
+            current_music = "combat_loop"
     pygame.display.flip()
 pygame.quit()
