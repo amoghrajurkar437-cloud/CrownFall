@@ -1558,6 +1558,11 @@ def draw_combat_screen(surface):
         image = pygame.image.load("crownfall_images/Enemy.png").convert_alpha()
         surface.blit(image, (80, 275))
 
+    player_img = pygame.image.load("crownfall_images/player_battle_img.png").convert_alpha()
+
+    scaled_player = pygame.transform.scale(player_img, (280, 560))
+    surface.blit(player_img, (550, 200))
+
     # Six buttons
     btn_names = ["Health Potion", "Strength Potion", "Special Attack", "Attack", "Defend", "Run"]
     btn_rects = []
@@ -3594,3 +3599,4 @@ while running:
             current_music = "combat_loop"
     pygame.display.flip()
 pygame.quit()
+
